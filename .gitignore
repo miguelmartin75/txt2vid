@@ -3,3 +3,5 @@ out/*
 *.pyc
 *.swp
 *.swo
+client_secrets.json
+*oauth2.json

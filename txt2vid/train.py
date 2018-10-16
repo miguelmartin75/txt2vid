@@ -59,16 +59,14 @@ def main(args):
     dataset = load_data(args.data, args.anno, vocab, batch_size=args.batch_size, val=False, num_workers=args.workers)
 
     # TODO: params
-    txt_encoder = SentenceEncoder(embed_size=50,
-                                  hidden_size=50, 
-                                  encoding_size=100, 
-                                  num_layers=2, 
+    txt_encoder = SentenceEncoder(embed_size=args.word_embed,
+                                  hidden_size=args.hidden_state, 
+                                  encoding_size=args.sent_encode, 
+                                  num_layers=args.txt_layers, 
                                   vocab_size=len(vocab)).to(device)
 
     discrim = model.Discrim(txt_encode_size=txt_encoder.encoding_size).to(device)
-    gen = model.Generator(latent_size=(txt_encoder.encoding_size + 100)).to(device)
-    #discrim = model.Discriminator().to(device)
-    #gen = model.Generator().to(device)
+    gen = model.Generator(latent_size=(txt_encoder.encoding_size + args.latent_size)).to(device)
 
     print(discrim)
     print(gen)
@@ -79,10 +77,7 @@ def main(args):
 
     REAL_LABEL = 1
     FAKE_LABEL = 0
-    SAMPLE_LATENT_SIZE = gen.latent_size - txt_encoder.encoding_size
-
-    #fixed_noise = torch.randn(args.batch_size, SAMPLE_LATENT_SIZE, 1, 1, device=device)
-    assert SAMPLE_LATENT_SIZE > 0
+    SAMPLE_LATENT_SIZE = args.latent_size
 
     REAL_LABELS = torch.full((args.batch_size,), REAL_LABEL, device=device, dtype=torch.float, requires_grad=False)
     FAKE_LABELS = torch.full((args.batch_size,), FAKE_LABEL, device=device, dtype=torch.float, requires_grad=False)
@@ -93,8 +88,6 @@ def main(args):
 
     print("Vocab Size %d" % len(vocab))
     print("Dataset len= %d (%d batches)" % (len(dataset)*args.batch_size, len(dataset)))
-    # TODO: param
-    #embed = nn.Embedding(len(vocab), 128).to(device)
 
     def gen_step(fake=None, cap_fv=None, real_labels=None, last=True):
         gen.zero_grad()
@@ -134,8 +127,8 @@ def main(args):
         return loss_discrim, fake
 
     
-    DISCRIM_STEPS = 1
-    GEN_STEPS = 2
+    DISCRIM_STEPS = args.discrim_steps
+    GEN_STEPS = args.gen_steps
 
     # TODO: when to backprop for txt_encoder
     for epoch in range(args.epoch):
@@ -180,7 +173,7 @@ def main(args):
 
             iteration = epoch*len(dataset) + i
 
-            if iteration != 0 and iteration % 200 == 0:
+            if iteration != 0 and iteration % 100 == 0:
                 
                 to_save = {
                     'gen': gen,
@@ -192,7 +185,7 @@ def main(args):
 
                 torch.save(to_save, '%s/iter_%d_lossG_%.4f_lossD_%.4f' % (args.out, iteration, gen_rolling / rolling, discrim_rolling / rolling))
 
-            if iteration % 5 == 0:
+            if iteration % 20 == 0:
                 print('[%d/%d][%d/%d] Loss_D: %.4f (%.4f) Loss_G: %.4f (%.4f)' % 
                         (epoch, args.epoch, i, len(dataset), 
                         loss_discrim.item(), discrim_rolling / rolling, 
@@ -200,7 +193,7 @@ def main(args):
 
             rolling += 1
 
-            if iteration % 20 == 0:
+            if iteration % 50 == 0:
                 gen_rolling = 0
                 discrim_rolling = 0
                 rolling = 1
@@ -237,6 +230,16 @@ if __name__ == '__main__':
     parser.add_argument('--lr', type=float, default=0.0002, help='learning rate, default=0.0002')
     parser.add_argument('--beta1', type=float, default=0.5, help='beta1 for adam. default=0.5')
     parser.add_argument('--beta2', type=float, default=0.999, help='beta1 for adam. default=0.5')
+    
+    parser.add_argument('--gen_steps', type=int, default=1, help='Number of generator steps to use per iteration')
+    parser.add_argument('--discrim_steps', type=int, default=1, help='Number of discriminator steps to use per iteration')
+
+    parser.add_argument('--word_embed', type=int, default=128, help='Dimensionality of each word (sentence model)')
+    parser.add_argument('--hidden_state', type=int, default=256, help='Dimensionality of hidden state (sentence model)')
+    parser.add_argument('--txt_layers', type=int, default=6, help='Number of layers in the sentence model')
+    parser.add_argument('--sent_encode', type=int, default=256, help='Encoding for the sentence')
+
+    parser.add_argument('--latent_size', type=int, default=100, help='Additional number of dimensions for random variable')
 
     parser.add_argument('--out', type=str, default='out', help='dir output path')
 

@@ -133,7 +133,6 @@ class Generator(nn.Module):
 def weights_init(layer):
     name = layer.__class__.__name__
     if 'Conv' in name or 'Linear' in name:
-        #layer.weight.data.normal_(1.0, 0.02)
         init.xavier_normal_(layer.weight.data)
         if layer.bias is not None:
             layer.bias.data.fill_(0.0)

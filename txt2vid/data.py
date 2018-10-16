@@ -47,6 +47,11 @@ class SynthDataset(data.Dataset):
 
         video.release()
 
+        #new_frames = []
+        #for i in range(int(len(frames)/2)):
+        #    new_frames.append(frames[2*i])
+        #frames = new_frames
+
         caption = [self.vocab(token) for token in self.vocab.tokenize(caption)]
         if caption[-1] != self.vocab(self.vocab.END):
             caption.append(self.vocab(self.vocab.END))
@@ -101,6 +106,16 @@ class Vocab(object):
                 yield self.END
             else:
                 yield word
+
+    def to_words(self, tokens):
+        result = ''
+        for i, tok in enumerate(tokens):
+            word = self.get_word(int(tok)) 
+            if word != self.END and i != 0:
+                result += ' '
+            result += word
+
+        return result
 
 def build_vocab(sentences):
     vocab = Vocab()

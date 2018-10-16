@@ -44,11 +44,9 @@ def main(args):
     if torch.cuda.is_available() and not args.cuda:
         warn('cuda is available, you probably want to use --cuda')
 
-    try:
-        import os
-        os.makedirs(args.out)
-    except OSError:
-        pass
+    from util.dir import ensure_exists
+    ensure_exists(args.out)
+    ensure_exists(args.out_samples)
 
     import txt2vid.model
     txt2vid.model.USE_NORMAL_INIT=args.use_normal_init
@@ -205,16 +203,21 @@ def main(args):
                 rolling = 1
 
                 # TODO: output sentences
-                to_save_real = videos[0]
-                to_save_fake = fake[0]
+                to_save_real = videos
+                to_save_fake = fake
+
+                num_frames = to_save_real.size(2)
 
                 #print(captions[0])
-                to_save_real = to_save_real.permute(1, 0, 2, 3)
-                to_save_fake = to_save_fake.permute(1, 0, 2, 3)
+                to_save_real = to_save_real.permute(0, 2, 1, 3, 4)
+                to_save_real = to_save_real.view(-1, to_save_real.size(2), to_save_real.size(3), to_save_real.size(4))
+                to_save_fake = to_save_fake.permute(0, 2, 1, 3, 4)
+                to_save_fake = to_save_fake.view(-1, to_save_fake.size(2), to_save_fake.size(3), to_save_fake.size(4))
+
                 print('saving to %s' % args.out)
                 #print(to_save_real.size())
-                vutils.save_image(to_save_real, '%s/real_samples.png' % args.out, normalize=True, nrow=to_save_real.size(0))
-                vutils.save_image(to_save_fake, '%s/fake_samples_epoch_%03d.png' % (args.out, epoch), normalize=True, nrow=to_save_fake.size(0))
+                vutils.save_image(to_save_real, '%s/real_samples.png' % args.out_samples, normalize=True, nrow=num_frames) #to_save_real.size(0))
+                vutils.save_image(to_save_fake, '%s/fake_samples_epoch_%03d_iter_%06d.png' % (args.out_samples, epoch, iteration), normalize=True, nrow=num_frames)#to_save_fake.size(0))
 
 
 
@@ -254,6 +257,7 @@ if __name__ == '__main__':
     parser.add_argument('--use_normal_init', action='store_true', help='Use normal init')
 
     parser.add_argument('--out', type=str, default='out', help='dir output path')
+    parser.add_argument('--out_samples', type=str, default='out_samples', help='dir output path')
 
     args = parser.parse_args()
     main(args)

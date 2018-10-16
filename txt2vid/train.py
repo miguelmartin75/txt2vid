@@ -107,18 +107,13 @@ def main(args):
 
         return loss
 
-    def discrim_step(videos=None, cap_fv=None, real_labels=None, fake_labels=None, last=True):
+    def discrim_step(videos=None, cap_fv=None, real_labels=None, fake_labels=None, last=True, fake=None):
         # real example
         real_pred = discrim(vids=videos, sent=cap_fv.detach())
         loss_discrim_real = criteria(real_pred, real_labels)
         loss_discrim_real.backward(retain_graph=not last)
 
         # fake example
-        latent = torch.randn(batch_size, SAMPLE_LATENT_SIZE, device=device)
-        fake_inp = torch.cat((cap_fv.detach(), latent), dim=1)
-        fake_inp = fake_inp.view(fake_inp.size(0), fake_inp.size(1), 1, 1, 1)
-
-        fake = gen(fake_inp)
         fake_pred = discrim(vids=fake.detach(), sent=cap_fv.detach())
         loss_discrim_fake = criteria(fake_pred, fake_labels)
         loss_discrim_fake.backward(retain_graph=not last)
@@ -127,7 +122,7 @@ def main(args):
 
         optimizerD.step()
 
-        return loss_discrim, fake
+        return loss_discrim
 
     
     DISCRIM_STEPS = args.discrim_steps
@@ -155,17 +150,26 @@ def main(args):
             discrim.zero_grad()
 
             cap_fv = txt_encoder(captions, lengths)
+            latent = torch.randn(batch_size, SAMPLE_LATENT_SIZE, device=device)
+            fake_inp = torch.cat((cap_fv.detach(), latent), dim=1)
+            fake_inp = fake_inp.view(fake_inp.size(0), fake_inp.size(1), 1, 1, 1)
+
+            fake = gen(fake_inp)
 
             # discrim step
             for j in range(DISCRIM_STEPS):
-                loss_discrim, fake = discrim_step(videos=videos,
-                                                  cap_fv=cap_fv, 
-                                                  real_labels=real_labels, 
-                                                  fake_labels=fake_labels,
-                                                  last=(j == DISCRIM_STEPS - 1))
+                loss_discrim = discrim_step(videos=videos,
+                                            cap_fv=cap_fv, 
+                                            real_labels=real_labels, 
+                                            fake_labels=fake_labels,
+                                            fake=fake,
+                                            last=(j == DISCRIM_STEPS - 1))
 
             # generator
             for j in range(GEN_STEPS):
+                if j != 0:
+                    fake = gen(fake_inp)
+
                 loss_gen = gen_step(fake=fake, 
                                     cap_fv=cap_fv,
                                     real_labels=real_labels,

@@ -16,14 +16,15 @@ def linear_step(prop, a, b):
     return (a + (b-a)*prop)
 
 def generate_frames(object_img=None, frame_size=None, repeat=False, frames=None,
-                  animation_len=None, step_fn=linear_step, fromPt=None, toPt=None):
+                  animation_len=None, step_fn=linear_step, fromPt=None, toPt=None, idx=None):
     assert object_img is not None
 
     repeat_count = 1
     if repeat:
-        repeat_count = int(animation_len/frames)
+        repeat_count = int((frames+1)/animation_len)
 
-    aStart = np.random.randint(0, frames - repeat_count*animation_len + 1)
+    #aStart = np.random.randint(0, frames - repeat_count*animation_len + 1)
+    aStart = 0
     aEnd = aStart + animation_len
 
     for i in range(frames):
@@ -37,11 +38,12 @@ def generate_frames(object_img=None, frame_size=None, repeat=False, frames=None,
             aEnd += animation_len
 
             # swap positions
-            aStart, aEnd = aEnd, aStart
+            #aStart, aEnd = aEnd, aStart
+            fromPt, toPt = toPt, fromPt
 
-        bbox = (curr_pos[0], curr_pos[1])#, object_img.size[0], object_img.size[1])
+        pos = (curr_pos[0], curr_pos[1])
         frame = Image.new('RGB', (frame_size[0], frame_size[1]))
-        frame.paste(object_img, bbox)
+        frame.paste(object_img, pos)
         yield frame
 
 
@@ -54,7 +56,7 @@ def save_video(frames, path, fps, frame_size):
         out.write(frame)
     out.release()
 
-def generate_examples(video_dir, sentence_out, num_examples=10, fps=None, frame_size=None, time=None, object_classes=None, objects=None, object_names=None):
+def generate_examples(video_dir, sentence_out, num_examples=10, fps=None, frame_size=None, num_frames=None, object_classes=None, objects=None, object_names=None):
     try:
         import os
         os.makedirs(video_dir)
@@ -83,25 +85,28 @@ def generate_examples(video_dir, sentence_out, num_examples=10, fps=None, frame_
         obj = objects[class_idx][idx]
         name = object_names[class_idx]
 
-        bounce = random.randint(0, 1) # should we repeat the animation, in the reverse?
-        animation_length = random.randint(int(0.1*time*fps), time*fps)
-        if bounce:
-            animation_length = random.randint(int(0.1*time*fps), time*fps/2)
+        bounce = True#random.randint(0, 1) # should we repeat the animation, in the reverse?
+        animation_length = random.randint(int(0.1*num_frames), num_frames)
+        #if bounce:
+            #animation_length = #int((num_frames+1)/animation_length)
+            #animation_length = random.randint(int(0.1*num_frames), num_frames/2)
 
 
         horizontal = random.randint(0, 1) # horiz or vert
-        l2r_u2d = random.randint(0, 1) # if false, go reverse
-        use_corners = random.randint(0, 1) # should we use corners or not
+        l2r_u2d = True#random.randint(0, 1) # if false, go reverse
+        use_corners = False#random.randint(0, 1) # should we use corners or not
 
         a = None # from position
         b = None # to position
 
-        sentence = '{} is '.format(name)
+        sentence = '{} '.format(name)
 
-        if bounce:
-            sentence += 'moving '
-        else:
-            sentence += 'moves '
+        #if bounce:
+        #    sentence += 'is moving '
+        #else:
+        #    sentence += 'moves '
+
+        sentence += 'is'
 
         if use_corners:
             i1 = np.random.randint(0, len(corners))
@@ -137,9 +142,9 @@ def generate_examples(video_dir, sentence_out, num_examples=10, fps=None, frame_
                 b = np.array([x2, y])
 
                 if l2r_u2d:
-                    sentence += 'left to right'
+                    sentence += 'left and right'
                 else:
-                    sentence += 'right to left'
+                    sentence += 'right and left'
             else:
                 x = np.random.randint(0, WIDTH)
                 y1 = np.random.randint(0, int(0.1*HEIGHT))
@@ -149,9 +154,9 @@ def generate_examples(video_dir, sentence_out, num_examples=10, fps=None, frame_
                 b = np.array([x, y2])
 
                 if l2r_u2d:
-                    sentence += 'top to bottom'
+                    sentence += 'top and bottom'
                 else:
-                    sentence += 'bottom to to'
+                    sentence += 'bottom and to'
 
             if not l2r_u2d:
                 a, b = b, a
@@ -165,21 +170,21 @@ def generate_examples(video_dir, sentence_out, num_examples=10, fps=None, frame_
         b[1] = np.clip(b[1], 0, HEIGHT - obj.size[1])
 
         # encode speed in sentence
-        if random.randint(0, 10) <= 8:
-            anim_prop = animation_length / (fps*time)
-            if anim_prop <= 0.1:
-                sentence += ' very fast'
-            elif anim_prop <= 0.4:
-                sentence += ' fast'
+        #if random.randint(0, 10) <= 8:
+        #    anim_prop = animation_length / (num_frames)
+        #    if anim_prop <= 0.1:
+        #        sentence += ' very fast'
+        #    elif anim_prop <= 0.4:
+        #        sentence += ' fast'
 
-        if bounce:
-            sentence += ' back and forth'
+        #if bounce:
+        #    sentence += ' back and forth'
         sentence += '.'
 
         sent_map[i] = [ sentence ]
 
-        frames = generate_frames(obj, FRAME_SIZE, frames=time*FPS, animation_len=animation_length, repeat=bounce, fromPt=a, toPt=b)
-        save_video(frames, '{}/{}.avi'.format(video_dir, i), FPS, FRAME_SIZE)
+        frames = generate_frames(obj, FRAME_SIZE, frames=num_frames, animation_len=animation_length, repeat=bounce, fromPt=a, toPt=b, idx=i)
+        save_video(frames, '{}/{}.avi'.format(video_dir, i), fps, frame_size)
 
     with open(sentence_out, 'wb') as out_f:
         import pickle
@@ -187,7 +192,7 @@ def generate_examples(video_dir, sentence_out, num_examples=10, fps=None, frame_
 
 
 def load_mnist(train=False):
-    data = datasets.MNIST('mnist_data', train=True, download=True)
+    data = datasets.MNIST('mnist_data', train=train, download=True)
 
     objects = {}
     object_classes = set()
@@ -196,6 +201,9 @@ def load_mnist(train=False):
     for t in data:
         img = t[0]
         clazz = int(t[1])
+
+        img = img.resize((28,28)) # TODO: customize
+
         if clazz not in objects:
             objects[clazz] = []
 
@@ -213,22 +221,24 @@ if __name__ == '__main__':
     np.random.seed(300)
 
     # PARAMETERS
-    WIDTH = 200
-    HEIGHT = 200
+    WIDTH = 48
+    HEIGHT = 48
     FPS = 30
-    VIDEO_LEN = 2 # seconds
+    VIDEO_LEN = 32 # number of frames
 
     FRAME_SIZE = np.array([WIDTH, HEIGHT])
 
-    for train, dset, num_examples in zip([False, True], ['train', 'test'], [40000, 10000]):
+    for train, dset, num_examples in zip([True, False], ['train', 'test'], [40000, 10000]):
         objects, object_classes, object_names = load_mnist(train)
 
-        print("Generating: %s" % dset)
-        generate_examples('synthetic_data/{}/videos'.format(dset), 
-                          'synthetic_data/{}/sent.pickle'.format(dset), 
+        video_out = 'data/synthetic/{}/videos'.format(dset)
+        sent_out = 'data/synthetic/{}/sent.pickle'.format(dset)
+        print("Generating: %s to %s" % (dset, video_out))
+        generate_examples(video_out, 
+                          sent_out, 
                           num_examples=num_examples,
                           frame_size=FRAME_SIZE,
-                          time=VIDEO_LEN, 
+                          num_frames=VIDEO_LEN,
                           fps=FPS,
                           object_classes=object_classes,
                           objects=objects,

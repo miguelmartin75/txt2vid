@@ -92,7 +92,7 @@ def generate_examples(video_dir, sentence_out, num_examples=10, fps=None, frame_
             #animation_length = random.randint(int(0.1*num_frames), num_frames/2)
 
 
-        horizontal = random.randint(0, 1) # horiz or vert
+        horizontal = False#random.randint(0, 1) # horiz or vert
         l2r_u2d = True#random.randint(0, 1) # if false, go reverse
         use_corners = False#random.randint(0, 1) # should we use corners or not
 
@@ -221,10 +221,10 @@ if __name__ == '__main__':
     np.random.seed(300)
 
     # PARAMETERS
-    WIDTH = 48
-    HEIGHT = 48
+    WIDTH = 64
+    HEIGHT = 64
     FPS = 30
-    VIDEO_LEN = 32 # number of frames
+    VIDEO_LEN = 64 # number of frames
 
     FRAME_SIZE = np.array([WIDTH, HEIGHT])
 

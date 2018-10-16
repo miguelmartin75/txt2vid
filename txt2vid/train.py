@@ -16,7 +16,6 @@ from txt2vid.model import SentenceEncoder
 from txt2vid.data import Vocab
 from util.log import status, warn, error
 
-
 FRAME_SIZE=64
 
 def load_data(video_dir=None, anno=None, vocab=None, batch_size=64, val=False, num_workers=4):
@@ -51,6 +50,9 @@ def main(args):
     except OSError:
         pass
 
+    import txt2vid.model
+    txt2vid.model.USE_NORMAL_INIT=args.use_normal_init
+
     device = torch.device("cuda:0" if args.cuda else "cpu")
     ngpu = int(args.ngpu)
 
@@ -72,7 +74,7 @@ def main(args):
     print(gen)
     print(txt_encoder)
 
-    optimizerD = optim.Adam(discrim.parameters(), lr=args.lr, betas=(args.beta1, args.beta2))
+    optimizerD = optim.Adam(discrim.parameters(), lr=args.lr, betas=(args.beta1, args.beta2), weight_decay=0.0005)
     optimizerG = optim.Adam(gen.parameters(), lr=args.lr, betas=(args.beta1, args.beta2))
 
     REAL_LABEL = 1
@@ -85,27 +87,33 @@ def main(args):
     FAKE_LABELS = FAKE_LABELS.view(FAKE_LABELS.size(0), 1)
 
     criteria = nn.BCELoss()
+    recon = nn.L1Loss()
+    if args.recon_l2:
+        recon = nn.MSELoss()
 
     print("Vocab Size %d" % len(vocab))
     print("Dataset len= %d (%d batches)" % (len(dataset)*args.batch_size, len(dataset)))
 
-    def gen_step(fake=None, cap_fv=None, real_labels=None, last=True):
+    def gen_step(fake=None, cap_fv=None, real_labels=None, last=True, real_videos=None):
         gen.zero_grad()
 
-        real_pred = discrim(vids=fake, sent=cap_fv)#.detach()
+        real_pred = discrim(vids=fake, sent=cap_fv)
         loss = criteria(real_pred, real_labels)
-        #loss = -torch.mean(output)
+        if args.recon_lambda > 0:
+            loss += args.recon_lambda * recon(fake, real_videos)
+
         loss.backward(retain_graph=not last)
+
 
         optimizerG.step()
 
-        return loss#, output.mean().item()
+        return loss
 
     def discrim_step(videos=None, cap_fv=None, real_labels=None, fake_labels=None, last=True):
         # real example
         real_pred = discrim(vids=videos, sent=cap_fv.detach())
         loss_discrim_real = criteria(real_pred, real_labels)
-        #loss_discrim_real.backward(retain_graph=not last)
+        loss_discrim_real.backward(retain_graph=not last)
 
         # fake example
         latent = torch.randn(batch_size, SAMPLE_LATENT_SIZE, device=device)
@@ -115,12 +123,9 @@ def main(args):
         fake = gen(fake_inp)
         fake_pred = discrim(vids=fake.detach(), sent=cap_fv.detach())
         loss_discrim_fake = criteria(fake_pred, fake_labels)
-        #loss_discrim_fake.backward(retain_graph=not last)
+        loss_discrim_fake.backward(retain_graph=not last)
         
-        #loss = -(torch.mean(fake_pred) - torch.mean(real_pred))
-        #loss.backward(retain_graph=not last)
         loss_discrim = loss_discrim_real + loss_discrim_fake
-        loss_discrim.backward(retain_graph=not last)
 
         optimizerD.step()
 
@@ -166,6 +171,7 @@ def main(args):
                 loss_gen = gen_step(fake=fake, 
                                     cap_fv=cap_fv,
                                     real_labels=real_labels,
+                                    real_videos=videos,
                                     last=(j == GEN_STEPS - 1))
 
             gen_rolling += loss_gen.item()
@@ -185,7 +191,7 @@ def main(args):
 
                 torch.save(to_save, '%s/iter_%d_lossG_%.4f_lossD_%.4f' % (args.out, iteration, gen_rolling / rolling, discrim_rolling / rolling))
 
-            if iteration % 20 == 0:
+            if iteration % 5 == 0:
                 print('[%d/%d][%d/%d] Loss_D: %.4f (%.4f) Loss_G: %.4f (%.4f)' % 
                         (epoch, args.epoch, i, len(dataset), 
                         loss_discrim.item(), discrim_rolling / rolling, 
@@ -193,7 +199,7 @@ def main(args):
 
             rolling += 1
 
-            if iteration % 50 == 0:
+            if iteration % 20 == 0:
                 gen_rolling = 0
                 discrim_rolling = 0
                 rolling = 1
@@ -201,6 +207,7 @@ def main(args):
                 # TODO: output sentences
                 to_save_real = videos[0]
                 to_save_fake = fake[0]
+
                 #print(captions[0])
                 to_save_real = to_save_real.permute(1, 0, 2, 3)
                 to_save_fake = to_save_fake.permute(1, 0, 2, 3)
@@ -227,8 +234,8 @@ if __name__ == '__main__':
     parser.add_argument('--anno', type=str, help='annotation location', required=True)
     parser.add_argument('--batch_size', type=int, default=64, help='input batch size')
 
-    parser.add_argument('--lr', type=float, default=0.0002, help='learning rate, default=0.0002')
-    parser.add_argument('--beta1', type=float, default=0.5, help='beta1 for adam. default=0.5')
+    parser.add_argument('--lr', type=float, default=0.0001, help='learning rate, default=0.0002')
+    parser.add_argument('--beta1', type=float, default=0.9, help='beta1 for adam. default=0.5')
     parser.add_argument('--beta2', type=float, default=0.999, help='beta1 for adam. default=0.5')
     
     parser.add_argument('--gen_steps', type=int, default=1, help='Number of generator steps to use per iteration')
@@ -236,10 +243,15 @@ if __name__ == '__main__':
 
     parser.add_argument('--word_embed', type=int, default=128, help='Dimensionality of each word (sentence model)')
     parser.add_argument('--hidden_state', type=int, default=256, help='Dimensionality of hidden state (sentence model)')
-    parser.add_argument('--txt_layers', type=int, default=6, help='Number of layers in the sentence model')
+    parser.add_argument('--txt_layers', type=int, default=3, help='Number of layers in the sentence model')
     parser.add_argument('--sent_encode', type=int, default=256, help='Encoding for the sentence')
 
     parser.add_argument('--latent_size', type=int, default=100, help='Additional number of dimensions for random variable')
+
+    parser.add_argument('--recon_lambda', type=float, default=0.1, help='Multiplier for reconstruction loss')
+    parser.add_argument('--recon_l2', action='store_true', help='Use L2 loss for recon')
+
+    parser.add_argument('--use_normal_init', action='store_true', help='Use normal init')
 
     parser.add_argument('--out', type=str, default='out', help='dir output path')
 

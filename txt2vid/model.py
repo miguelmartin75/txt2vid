@@ -130,10 +130,18 @@ class Generator(nn.Module):
         vids = self.seq(x)
         return vids
 
+
+USE_NORMAL_INIT=False
+
 def weights_init(layer):
     name = layer.__class__.__name__
     if 'Conv' in name or 'Linear' in name:
-        init.xavier_normal_(layer.weight.data)
+        #global USE_NORMAL_INIT
+        if USE_NORMAL_INIT:
+            layer.weight.data.normal_(0.0, 0.02)
+        else:
+            init.xavier_normal_(layer.weight.data)
+
         if layer.bias is not None:
             layer.bias.data.fill_(0.0)
     elif 'BatchNorm' in name:
@@ -142,13 +150,3 @@ def weights_init(layer):
 
         if hasattr(layer, 'bias') and layer.bias is not None:
             layer.bias.data.fill_(0.0)
-
-    #if 'Conv' in name or 'Linear' in name:
-    #    if hasattr(layer, 'weight') and layer.weight is not None:
-    #        layer.weight.data.normal_(0.0, 0.02)
-
-    #    if hasattr(layer, 'bias') and layer.bias is not None:
-    #        layer.bias.data.fill_(0.0)
-
-    #if 'BatchNorm' in name:
-    #    layer.weight.data.normal_(1.0, 0.02)

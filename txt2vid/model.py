@@ -60,12 +60,10 @@ class Discrim(nn.Module):
         )
 
         self.predictor = nn.Sequential(
-            nn.Linear(txt_encode_size*2, 1),
+            nn.Linear(txt_encode_size*2, txt_encode_size),
+            nn.BatchNorm3d(txt_encode_size),
             nn.LeakyReLU(0.2, True),
-            #nn.Linear(512, 1),
-            #nn.LeakyReLU(0.2, True),
-            # TODO: don't use sigmoid?
-            # might be better to use, idk
+            nn.Linear(txt_encode_size, 1),
             nn.Sigmoid() 
         )
 
@@ -138,8 +136,10 @@ def weights_init(layer):
     if 'Conv' in name or 'Linear' in name:
         #global USE_NORMAL_INIT
         if USE_NORMAL_INIT:
+            print("normal init")
             layer.weight.data.normal_(0.0, 0.02)
         else:
+            print("xavier init")
             init.xavier_normal_(layer.weight.data)
 
         if layer.bias is not None:

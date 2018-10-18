@@ -1,6 +1,8 @@
 import random
 import argparse
 
+import sys
+
 import torch
 import torch.nn as nn
 import torch.backends.cudnn as cudnn
@@ -73,7 +75,7 @@ def main(args):
     print(txt_encoder)
 
     optimizerD = optim.Adam(discrim.parameters(), lr=args.lr, betas=(args.beta1, args.beta2), weight_decay=0.0005)
-    optimizerG = optim.Adam(gen.parameters(), lr=args.lr, betas=(args.beta1, args.beta2))
+    optimizerG = optim.Adam([ { "params": gen.parameters() }, { "params": txt_encoder.parameters() } ], lr=args.lr, betas=(args.beta1, args.beta2))
 
     REAL_LABEL = 1
     FAKE_LABEL = 0
@@ -136,6 +138,7 @@ def main(args):
         discrim_rolling = 0
         rolling = 1
         for i, (videos, captions, lengths) in enumerate(dataset):
+            sys.stdout.flush()
             # TODO: hyper-params for GAN training
             videos = videos.to(device).permute(0, 2, 1, 3, 4)
             captions = captions.to(device)
@@ -193,7 +196,7 @@ def main(args):
 
                 torch.save(to_save, '%s/iter_%d_lossG_%.4f_lossD_%.4f' % (args.out, iteration, gen_rolling / rolling, discrim_rolling / rolling))
 
-            if iteration % 5 == 0:
+            if iteration % 10 == 0:
                 print('[%d/%d][%d/%d] Loss_D: %.4f (%.4f) Loss_G: %.4f (%.4f)' % 
                         (epoch, args.epoch, i, len(dataset), 
                         loss_discrim.item(), discrim_rolling / rolling, 
@@ -201,7 +204,7 @@ def main(args):
 
             rolling += 1
 
-            if iteration % 20 == 0:
+            if iteration % 50 == 0:
                 gen_rolling = 0
                 discrim_rolling = 0
                 rolling = 1

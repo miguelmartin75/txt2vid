@@ -20,18 +20,21 @@ from util.log import status, warn, error
 
 FRAME_SIZE=64
 
-def load_data(video_dir=None, anno=None, vocab=None, batch_size=64, val=False, num_workers=4):
+def load_data(video_dir=None, anno=None, vocab=None, batch_size=64, val=False, num_workers=4, num_channels=3, random_frames=0):
     # TODO
     from data import get_loader
 
-    transform = transforms.Compose([transforms.Resize(FRAME_SIZE),
-                                    transforms.Grayscale(),
-                                    transforms.ToTensor(),
-                                    transforms.Normalize([0.5],[0.5])])
-                                    #transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
-                                    #transforms.Normalize((0.485, 0.456, 0.406), 
-                                    #                     (0.229, 0.224, 0.225))])
-    return get_loader(video_dir, anno, vocab, transform, batch_size, shuffle=not val, num_workers=num_workers)
+    if num_channels == 3:
+        transform = transforms.Compose([transforms.Resize((FRAME_SIZE, FRAME_SIZE)),
+                                        transforms.ToTensor(),
+                                        transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
+    else:
+        transform = transforms.Compose([transforms.Resize((FRAME_SIZE, FRAME_SIZE)),
+                                        transforms.Grayscale(),
+                                        transforms.ToTensor(),
+                                        transforms.Normalize([0.5],[0.5])])
+
+    return get_loader(video_dir, anno, vocab, transform, batch_size, shuffle=not val, num_workers=num_workers, random_frames=random_frames)
 
 def main(args):
     if args.seed is None:
@@ -58,7 +61,7 @@ def main(args):
 
     from util.pickle import load
     vocab = load(args.vocab)
-    dataset = load_data(args.data, args.anno, vocab, batch_size=args.batch_size, val=False, num_workers=args.workers)
+    dataset = load_data(args.data, args.anno, vocab, batch_size=args.batch_size, val=False, num_workers=args.workers, num_channels=args.num_channels, random_frames=args.random_frames)
 
     # TODO: params
     txt_encoder = SentenceEncoder(embed_size=args.word_embed,
@@ -67,8 +70,10 @@ def main(args):
                                   num_layers=args.txt_layers, 
                                   vocab_size=len(vocab)).to(device)
 
-    discrim = model.Discrim(txt_encode_size=txt_encoder.encoding_size).to(device)
-    gen = model.Generator(latent_size=(txt_encoder.encoding_size + args.latent_size)).to(device)
+    discrim = model.Discrim(txt_encode_size=txt_encoder.encoding_size,
+                            num_channels=args.num_channels).to(device)
+    gen = model.Generator(latent_size=(txt_encoder.encoding_size + args.latent_size), 
+                          num_channels=args.num_channels).to(device)
 
     print(discrim)
     print(gen)
@@ -142,6 +147,9 @@ def main(args):
             # TODO: hyper-params for GAN training
             videos = videos.to(device).permute(0, 2, 1, 3, 4)
             captions = captions.to(device)
+
+            print(videos.size())
+            print(captions.size())
 
             batch_size = videos.size(0)
             real_labels = REAL_LABELS[0:batch_size]
@@ -265,6 +273,9 @@ if __name__ == '__main__':
 
     parser.add_argument('--out', type=str, default='out', help='dir output path')
     parser.add_argument('--out_samples', type=str, default='out_samples', help='dir output path')
+
+    parser.add_argument('--num_channels', type=int, default=1, help='number of channels in input')
+    parser.add_argument('--random_frames', type=int, default=0, help='use random frames')
 
     args = parser.parse_args()
     main(args)

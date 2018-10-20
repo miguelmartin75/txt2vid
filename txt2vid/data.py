@@ -8,11 +8,12 @@ import numpy as np
 
 class SynthDataset(data.Dataset):
 
-    def __init__(self, video_dir=None, vocab=None, captions=None, transform=None):
+    def __init__(self, video_dir=None, vocab=None, captions=None, transform=None, random_frames=0):
         from util.pickle import load
         self.video_dir = video_dir
         self.vocab = vocab
         self.transform = transform
+        self.random_frames = random_frames
 
         captions = load(captions)
 
@@ -47,10 +48,27 @@ class SynthDataset(data.Dataset):
 
         video.release()
 
-        new_frames = []
-        for i in range(int(len(frames)/2)):
-            new_frames.append(frames[2*i])
-        frames = new_frames
+
+        if self.random_frames == 0:
+            new_frames = []
+            for i in range(int(len(frames)/2)):
+                new_frames.append(frames[2*i])
+            frames = new_frames
+        else:
+            if len(frames) < self.random_frames:
+                print('Video %s with %d frames' % (video_path, len(frames)))
+
+            assert(len(frames) >= self.random_frames)
+
+            perm = np.random.permutation(range(len(frames)))[0:self.random_frames]
+            assert(len(perm) == self.random_frames)
+
+            perm.sort()
+            new_frames = []
+            for i in perm:
+                new_frames.append(frames[i])
+            frames = new_frames
+            assert(len(frames) == self.random_frames)
 
         caption = [self.vocab(token) for token in self.vocab.tokenize(caption)]
         if caption[-1] != self.vocab(self.vocab.END):
@@ -156,9 +174,9 @@ def collate_fn(data):
         targets[i, :end] = cap[:end]        
     return vids, targets, lengths
 
-def get_loader(video_dir, captions, vocab, transform, batch_size, shuffle, num_workers):
+def get_loader(video_dir, captions, vocab, transform, batch_size, shuffle, num_workers, random_frames):
     """Returns torch.utils.data.DataLoader for custom coco dataset."""
-    dset = SynthDataset(video_dir=video_dir, captions=captions, vocab=vocab, transform=transform) 
+    dset = SynthDataset(video_dir=video_dir, captions=captions, vocab=vocab, transform=transform, random_frames=random_frames) 
 
     data_loader = torch.utils.data.DataLoader(dataset=dset, 
                                               batch_size=batch_size,

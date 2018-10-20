@@ -1,6 +1,8 @@
 from pathlib import Path
 import pandas
 
+import cv2
+
 # input: list of YT video IDs
 # output: {video ID: catagory} mapping
 def get_categories(video_list):
@@ -27,6 +29,9 @@ def download_yt(video):
     pass
 
 
+MAX_FRAMES = 32
+MAX_DESC = 60
+
 # returns set of (video: [ sentences ]) pairs
 def read_data(csv_path_or_buf, yt_clip_dir='data/YouTubeClips'):
     result = {}
@@ -46,43 +51,54 @@ def read_data(csv_path_or_buf, yt_clip_dir='data/YouTubeClips'):
     END = 3
     DESC = 4
     result = {}
-    for row in csv.itertuples():
-        name = row[VIDEO_ID]
 
-        key = (name, row[START], row[END])
+    import tqdm
+    rows = list(csv.itertuples())
+    for row in tqdm.tqdm(rows):
+        name = row[VIDEO_ID]
+        start = row[START]
+        end = row[END]
+        vid_len = end - start + 1
+
+        key = name
+        key += '_'
+        key += str(start) 
+        key += '_'
+        key += str(end)
+
+        desc = row[DESC]
+        
+        video_name = '%s/%s.avi' % ('data/YouTubeClips', key)
+        video = cv2.VideoCapture(video_name)
+        fps = video.get(cv2.CAP_PROP_FPS)
+        video.release()
+        num_frames = vid_len * fps
+        if len(desc) > MAX_DESC or vid_len*fps < MAX_FRAMES:
+            continue
 
         if key not in result:
             result[key] = []
 
-        desc = row[DESC]
-
-        if len(desc) <= 60:
-            result[key].append(desc)
+        result[key].append(desc)
 
     video_ids = [ k for k in result ]
-    got_videos = [ p.stem[0:p.stem.find('_')] for p in Path(yt_clip_dir).iterdir() ]
+    got_videos = [ p.stem for p in Path(yt_clip_dir).iterdir() ]
     missing = [ k for k in set(video_ids) - set(got_videos) ]
 
     print('missing %d videos' % len(missing))
 
-    # TODO
-    #for m in missing:
-        #print(m)
+    # TODO: download vids
+    for m in missing:
+        result.pop(m)
         #download_yt(m, yt_clip_dir)
+
+    print('have %d unique videos' % len(result))
+    print('have %d samples' % len([ sent for key in result for sent in result[key] ]))
 
     return result
 
 if __name__ == '__main__':
-    data = read_data('data/MSR.csv')
-
-    sent_map = {}
-    for k in data:
-        video_name = k[0]
-        video_name += "_"
-        video_name += str(k[1])
-        video_name += "_"
-        video_name += str(k[2])
-        sent_map[video_name] = data[k]
+    sent_map = read_data('data/MSR.csv')
 
     with open('data/msr.pickle', 'wb') as out_f:
         import pickle

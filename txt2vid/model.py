@@ -71,16 +71,17 @@ class Discrim(nn.Module):
 
     def forward(self, vids=None, sent=None):
         vids = self.vid(vids)
+        return vids
 
         # flatten
-        vids = vids.view(vids.size(0), -1)
-        sent = sent.view(sent.size(0), -1)
+        #vids = vids.view(vids.size(0), -1)
+        #sent = sent.view(sent.size(0), -1)
 
-        # concat img + sentence
-        vids_plus_sent = torch.cat((vids, sent), dim=1)
+        ## concat img + sentence
+        #vids_plus_sent = torch.cat((vids, sent), dim=1)
 
-        # predict
-        return self.predictor(vids_plus_sent)
+        ## predict
+        #return self.predictor(vids_plus_sent)
 
 class Generator(nn.Module):
     def __init__(self, latent_size=256, num_channels=1):

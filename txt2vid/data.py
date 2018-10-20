@@ -38,6 +38,8 @@ class SynthDataset(data.Dataset):
             if not ok:
                 break
 
+            frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+
             from PIL import Image
             frame = Image.fromarray(frame)
 

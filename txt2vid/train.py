@@ -226,10 +226,10 @@ def main(args):
                 #print(captions[0])
                 to_save_real = to_save_real.permute(0, 2, 1, 3, 4)
                 to_save_real = to_save_real.view(-1, to_save_real.size(2), to_save_real.size(3), to_save_real.size(4))
-                to_save_fake = to_save_fake.permute(0, 2, 1, 3, 4)
+                to_save_fake = to_save_fake.permute(0, 2, 1, 3, 4).contiguous()
                 to_save_fake = to_save_fake.view(-1, to_save_fake.size(2), to_save_fake.size(3), to_save_fake.size(4))
 
-                print('saving to %s' % args.out)
+                print('saving to %s' % args.out_samples)
                 #print(to_save_real.size())
                 vutils.save_image(to_save_real, '%s/real_samples.png' % args.out_samples, normalize=True, nrow=num_frames) #to_save_real.size(0))
                 vutils.save_image(to_save_fake, '%s/fake_samples_epoch_%03d_iter_%06d.png' % (args.out_samples, epoch, iteration), normalize=True, nrow=num_frames)#to_save_fake.size(0))

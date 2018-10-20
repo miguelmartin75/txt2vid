@@ -81,11 +81,12 @@ class Discrim(nn.Module):
         #return vids.view(vids.size(0), -1)
 
         vids = self.vid(vids)
+        return vids
+
         #print(vids.size())
 
         # flatten
         #vids = vids.view(vids.size(0), -1)
-        return vids
         #sent = sent.view(sent.size(0), -1)
 
         ## concat img + sentence

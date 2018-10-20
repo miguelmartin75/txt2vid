@@ -193,7 +193,7 @@ def main(args):
 
                 torch.save(to_save, '%s/iter_%d_lossG_%.4f_lossD_%.4f' % (args.out, iteration, gen_rolling / rolling, discrim_rolling / rolling))
 
-            if iteration % 5 == 0:
+            if iteration % 10 == 0:
                 print('[%d/%d][%d/%d] Loss_D: %.4f (%.4f) Loss_G: %.4f (%.4f)' % 
                         (epoch, args.epoch, i, len(dataset), 
                         loss_discrim.item(), discrim_rolling / rolling, 

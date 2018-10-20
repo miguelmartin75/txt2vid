@@ -1,6 +1,8 @@
 import random
 import argparse
 
+import sys
+
 import torch
 import torch.nn as nn
 import torch.backends.cudnn as cudnn
@@ -73,7 +75,7 @@ def main(args):
     print(txt_encoder)
 
     optimizerD = optim.Adam(discrim.parameters(), lr=args.lr, betas=(args.beta1, args.beta2), weight_decay=0.0005)
-    optimizerG = optim.Adam(gen.parameters(), lr=args.lr, betas=(args.beta1, args.beta2))
+    optimizerG = optim.Adam([ { "params": gen.parameters() }, { "params": txt_encoder.parameters() } ], lr=args.lr, betas=(args.beta1, args.beta2))
 
     REAL_LABEL = 1
     FAKE_LABEL = 0
@@ -136,6 +138,7 @@ def main(args):
         discrim_rolling = 0
         rolling = 1
         for i, (videos, captions, lengths) in enumerate(dataset):
+            sys.stdout.flush()
             # TODO: hyper-params for GAN training
             videos = videos.to(device).permute(0, 2, 1, 3, 4)
             captions = captions.to(device)
@@ -201,7 +204,7 @@ def main(args):
 
             rolling += 1
 
-            if iteration % 20 == 0:
+            if iteration % 50 == 0:
                 gen_rolling = 0
                 discrim_rolling = 0
                 rolling = 1

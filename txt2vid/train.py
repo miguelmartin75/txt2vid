@@ -204,7 +204,7 @@ def main(args):
 
             rolling += 1
 
-            if iteration % 50 == 0:
+            if iteration % 10 == 0:
                 gen_rolling = 0
                 discrim_rolling = 0
                 rolling = 1

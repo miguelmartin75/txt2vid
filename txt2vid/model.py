@@ -38,7 +38,11 @@ class Discrim(nn.Module):
         super().__init__()
 
         self.vid = nn.Sequential(
-            nn.Conv3d(num_channels, 128, 4, 2, 1, bias=False), # 64
+            nn.Conv3d(num_channels, 64, 4, 2, 1, bias=False), # 64
+            nn.BatchNorm3d(64),
+            nn.LeakyReLU(0.2, True),
+
+            nn.Conv3d(64, 128, 4, 2, 1, bias=False), # 128
             nn.BatchNorm3d(128),
             nn.LeakyReLU(0.2, True),
 
@@ -50,37 +54,45 @@ class Discrim(nn.Module):
             nn.BatchNorm3d(512),
             nn.LeakyReLU(0.2, True),
 
-            nn.Conv3d(512, 1024, 4, 2, 1, bias=False), # 512
-            nn.BatchNorm3d(1024),
-            nn.LeakyReLU(0.2, True),
+            nn.Conv3d(512, 1, (2, 4, 4), 1, 0, bias=False), # 512
+            nn.Sigmoid()
 
-            nn.Conv3d(1024, txt_encode_size, (2, 4, 4), (1, 1, 1), 0, bias=False), # 512
-            nn.BatchNorm3d(txt_encode_size),
-            nn.LeakyReLU(0.2, True),
+            #nn.BatchNorm3d(1024),
+            #nn.LeakyReLU(0.2, True),
+
+            #nn.Conv3d(1024, txt_encode_size, (2, 4, 4), (1, 1, 1), 0, bias=False), # 512
+            #nn.BatchNorm3d(txt_encode_size),
+            #nn.LeakyReLU(0.2, True),
         )
 
-        self.predictor = nn.Sequential(
-            nn.Linear(txt_encode_size*2, txt_encode_size),
-            nn.BatchNorm3d(txt_encode_size),
-            nn.LeakyReLU(0.2, True),
-            nn.Linear(txt_encode_size, 1),
-            nn.Sigmoid() 
-        )
+        #self.predictor = nn.Sequential(
+        #    nn.Linear(txt_encode_size*2, txt_encode_size),
+        #    nn.BatchNorm1d(txt_encode_size),
+        #    nn.LeakyReLU(0.2, True),
+        #    nn.Linear(txt_encode_size, 1),
+
+        #    nn.Sigmoid() 
+        #)
 
         self.apply(weights_init)
 
     def forward(self, vids=None, sent=None):
+        #vids = self.vid(vids)
+        #return vids.view(vids.size(0), -1)
+
         vids = self.vid(vids)
+        #print(vids.size())
 
         # flatten
         vids = vids.view(vids.size(0), -1)
-        sent = sent.view(sent.size(0), -1)
+        return vids
+        #sent = sent.view(sent.size(0), -1)
 
-        # concat img + sentence
-        vids_plus_sent = torch.cat((vids, sent), dim=1)
+        ## concat img + sentence
+        #vids_plus_sent = torch.cat((vids, sent), dim=1)
 
-        # predict
-        return self.predictor(vids_plus_sent)
+        ## predict
+        #return self.predictor(vids_plus_sent)
 
 class Generator(nn.Module):
     def __init__(self, latent_size=256, num_channels=1):
@@ -90,11 +102,7 @@ class Generator(nn.Module):
         
         self.seq = nn.Sequential(
             # input is Z, going into a de-convolution
-            nn.ConvTranspose3d(latent_size, 1024, kernel_size=(2, 4, 4), bias=False),
-            nn.BatchNorm3d(1024),
-            nn.LeakyReLU(0.2, True),
-
-            nn.ConvTranspose3d(1024, 512, kernel_size=4, stride=2, padding=1, bias=False),
+            nn.ConvTranspose3d(latent_size, 512, kernel_size=(2, 4, 4), padding=0, bias=False),
             nn.BatchNorm3d(512),
             nn.LeakyReLU(0.2, True),
 
@@ -106,9 +114,33 @@ class Generator(nn.Module):
             nn.BatchNorm3d(128),
             nn.LeakyReLU(0.2, True),
 
-            nn.ConvTranspose3d(128, num_channels, kernel_size=4, stride=2, padding=1, bias=False),
-            nn.BatchNorm3d(num_channels),
+            nn.ConvTranspose3d(128, 64, kernel_size=4, stride=2, padding=1, bias=False),
+            nn.BatchNorm3d(64),
             nn.LeakyReLU(0.2, True),
+
+            nn.ConvTranspose3d(64, num_channels, kernel_size=4, stride=2, padding=1, bias=False),
+            #nn.BatchNorm3d(num_channels),
+            #nn.LeakyReLU(0.2, True),
+
+            #nn.ConvTranspose3d(latent_size, 1024, kernel_size=(2, 4, 4), padding=0, bias=False),
+            #nn.BatchNorm3d(1024),
+            #nn.LeakyReLU(0.2, True),
+
+            #nn.ConvTranspose3d(1024, 512, kernel_size=4, stride=2, padding=1, bias=False),
+            #nn.BatchNorm3d(512),
+            #nn.LeakyReLU(0.2, True),
+
+            #nn.ConvTranspose3d(512, 256, kernel_size=4, stride=2, padding=1, bias=False),
+            #nn.BatchNorm3d(256),
+            #nn.LeakyReLU(0.2, True),
+
+            #nn.ConvTranspose3d(256, 128, kernel_size=4, stride=2, padding=1, bias=False),
+            #nn.BatchNorm3d(128),
+            #nn.LeakyReLU(0.2, True),
+
+            #nn.ConvTranspose3d(128, num_channels, kernel_size=4, stride=2, padding=1, bias=False),
+            #nn.BatchNorm3d(num_channels),
+            #nn.LeakyReLU(0.2, True),
 
             nn.Tanh()
         )

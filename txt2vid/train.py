@@ -102,15 +102,15 @@ def main(args):
 
         real_pred = discrim(vids=fake, sent=cap_fv)
         loss = criteria(real_pred, real_labels)
+        recon_loss = recon(fake, real_videos) 
         if args.recon_lambda > 0:
-            loss += args.recon_lambda * recon(fake, real_videos)
+            loss += args.recon_lambda * recon_loss
 
         loss.backward(retain_graph=not last)
 
-
         optimizerG.step()
 
-        return loss
+        return loss, recon_loss
 
     def discrim_step(videos=None, cap_fv=None, real_labels=None, fake_labels=None, last=True, fake=None):
         # real example
@@ -133,21 +133,22 @@ def main(args):
     DISCRIM_STEPS = args.discrim_steps
     GEN_STEPS = args.gen_steps
 
+    from txt2vid.metrics import RollingAvgLoss
+
+    LOSS_WINDOW_SIZE=100
+    gen_loss = RollingAvgLoss(window_size=LOSS_WINDOW_SIZE)
+    gen_recon_loss = RollingAvgLoss(window_size=LOSS_WINDOW_SIZE)
+    discrim_loss = RollingAvgLoss(window_size=LOSS_WINDOW_SIZE)
+
     # TODO: when to backprop for txt_encoder
     for epoch in range(args.epoch):
         print('epoch=', epoch + 1)
 
-        gen_rolling = 0
-        discrim_rolling = 0
-        rolling = 1
         for i, (videos, captions, lengths) in enumerate(dataset):
             sys.stdout.flush()
             # TODO: hyper-params for GAN training
             videos = videos.to(device).permute(0, 2, 1, 3, 4)
             captions = captions.to(device)
-
-            print(videos.size())
-            print(captions.size())
 
             batch_size = videos.size(0)
             real_labels = REAL_LABELS[0:batch_size]
@@ -167,26 +168,27 @@ def main(args):
 
             # discrim step
             for j in range(DISCRIM_STEPS):
-                loss_discrim = discrim_step(videos=videos,
+                ld = discrim_step(videos=videos,
                                             cap_fv=cap_fv, 
                                             real_labels=real_labels, 
                                             fake_labels=fake_labels,
                                             fake=fake,
                                             last=(j == DISCRIM_STEPS - 1))
+                discrim_loss.update(ld)
 
             # generator
             for j in range(GEN_STEPS):
                 if j != 0:
                     fake = gen(fake_inp)
 
-                loss_gen = gen_step(fake=fake, 
-                                    cap_fv=cap_fv,
-                                    real_labels=real_labels,
-                                    real_videos=videos,
-                                    last=(j == GEN_STEPS - 1))
-
-            gen_rolling += loss_gen.item()
-            discrim_rolling += loss_discrim.item()
+                lg, lgr = gen_step(fake=fake, 
+                                   cap_fv=cap_fv,
+                                   real_labels=real_labels,
+                                   real_videos=videos,
+                                   last=(j == GEN_STEPS - 1))
+                
+                gen_loss.update(lg)
+                gen_recon_loss.update(lgr)
 
             iteration = epoch*len(dataset) + i
 
@@ -200,21 +202,13 @@ def main(args):
                     'optD': optimizerD
                 }
 
-                torch.save(to_save, '%s/iter_%d_lossG_%.4f_lossD_%.4f' % (args.out, iteration, gen_rolling / rolling, discrim_rolling / rolling))
+                torch.save(to_save, '%s/iter_%d_lossG_%.4f_lossD_%.4f' % (args.out, iteration, gen_loss.get(), discrim_loss.get()))
 
             if iteration % 10 == 0:
-                print('[%d/%d][%d/%d] Loss_D: %.4f (%.4f) Loss_G: %.4f (%.4f)' % 
-                        (epoch, args.epoch, i, len(dataset), 
-                        loss_discrim.item(), discrim_rolling / rolling, 
-                        loss_gen.item(), gen_rolling / (rolling)))
-
-            rolling += 1
+                print('[%d/%d][%d/%d] Loss_D: %.4f Loss_G: %.4f (recon = %.4f)' % 
+                        (epoch, args.epoch, i, len(dataset), discrim_loss.get(), gen_loss.get(), gen_recon_loss.get()))
 
             if iteration % 10 == 0:
-                gen_rolling = 0
-                discrim_rolling = 0
-                rolling = 1
-
                 # TODO: output sentences
                 to_save_real = videos
                 to_save_fake = fake

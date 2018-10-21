@@ -5,3 +5,7 @@ out/*
 *.swo
 client_secrets.json
 *oauth2.json
+*_BASE_*
+*_LOCAL_*
+*_REMOTE_*
+*.orig

@@ -5,13 +5,46 @@ import torchvision.transforms as transforms
 import torch.utils.data as data
 
 import cv2
+from PIL import Image
 
 import numpy as np
+
+def to_pil(cv2_img):
+    cv2_img = cv2.cvtColor(cv2_img, cv2.COLOR_BGR2RGB)
+    return Image.fromarray(cv2_img)
+
+def read_video_file(video_path, vid, cache=None):
+    video = cv2.VideoCapture(str(video_path))
+
+    idx = 0
+    while(video.isOpened()):
+        ok, frame = video.read()
+
+        if not ok:
+            break
+
+        frame = to_pil(frame)
+
+        if cache:
+            path_to_save = '%s/%s/%d.jpg' % (cache, vid, idx)
+            parent_path = Path(path_to_save).parent
+            if not parent_path.exists():
+                parent_path.mkdir()
+            frame.save(path_to_save)
+
+        idx += 1
+
+        yield frame
+
+    video.release()
 
 class SynthDataset(data.Dataset):
 
     def get_video_path(self, vid_id):
         return '%s/%s.avi' % (self.video_dir, vid_id)
+
+    def get_cache_video_path(self, vid_id):
+        return '%s/%s' % (self.video_dir, vid_id)
 
 
     def __init__(self, video_dir=None, captions=None, transform=None, random_frames=0):
@@ -43,35 +76,40 @@ class SynthDataset(data.Dataset):
         print("Missing: %d videos" % self.missing)
 
     def __getitem__(self, idx):
-        vid = self.video_ids[idx]
+        vid = str(self.video_ids[idx])
         caption = self.captions[idx]
 
-        video = cv2.VideoCapture(self.get_video_path(vid))
-
+        cache = Path(self.get_cache_video_path(vid))
+        assert(cache.exists())
+        
         frames = []
-        while(video.isOpened()):
-            ok, frame = video.read()
+        #if cache.exists():
+        for frame_path in cache.iterdir():
+            if frame_path.suffix != '.jpg' and frame_path.suffix != '.png':
+                continue
 
-            if not ok:
-                break
+            frames.append(int(frame_path.stem))
 
-            frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        frames.sort()
 
-            from PIL import Image
-            frame = Image.fromarray(frame)
+        #else:
+        #    cache.mkdir()
 
-            if self.transform:
-                frame = self.transform(frame)
+        #    for frame in read_video_file(self.get_video_path(vid), vid=vid, cache=cache):
+        #        if self.transform:
+        #            frame = self.transform(frame)
 
-            frames.append(frame)
-
-        video.release()
+        #        frames.append(frame)
 
 
         if self.random_frames == 0:
             new_frames = []
-            for i in range(int(len(frames)/2)):
-                new_frames.append(frames[2*i])
+            # TODO: remove 32 constant
+            factor=int(len(frames)/32)
+            i = 0
+            while i < 32:
+                new_frames.append(frames[factor*i])
+                i += 1
             frames = new_frames
         else:
             if len(frames) < self.random_frames:
@@ -88,6 +126,15 @@ class SynthDataset(data.Dataset):
                 new_frames.append(frames[i])
             frames = new_frames
             assert(len(frames) == self.random_frames)
+
+        def map_frame(path):
+            path = '%s/%s.jpg' % (cache, path)
+            img = Image.open(path)
+            if self.transform:
+                img = self.transform(img)
+            return img
+
+        frames = [ map_frame(path) for path in frames ]
 
         caption = [self.vocab(token) for token in self.vocab.tokenize(caption)]
         if caption[-1] != self.vocab(self.vocab.END):

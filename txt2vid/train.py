@@ -145,7 +145,6 @@ def main(args):
         print('epoch=', epoch + 1)
 
         for i, (videos, captions, lengths) in enumerate(dataset):
-            sys.stdout.flush()
             # TODO: hyper-params for GAN training
             videos = videos.to(device).permute(0, 2, 1, 3, 4)
             captions = captions.to(device)
@@ -169,11 +168,11 @@ def main(args):
             # discrim step
             for j in range(DISCRIM_STEPS):
                 ld = discrim_step(videos=videos,
-                                            cap_fv=cap_fv, 
-                                            real_labels=real_labels, 
-                                            fake_labels=fake_labels,
-                                            fake=fake,
-                                            last=(j == DISCRIM_STEPS - 1))
+                                  cap_fv=cap_fv, 
+                                  real_labels=real_labels, 
+                                  fake_labels=fake_labels,
+                                  fake=fake,
+                                  last=(j == DISCRIM_STEPS - 1))
                 discrim_loss.update(ld)
 
             # generator
@@ -205,10 +204,11 @@ def main(args):
                 torch.save(to_save, '%s/iter_%d_lossG_%.4f_lossD_%.4f' % (args.out, iteration, gen_loss.get(), discrim_loss.get()))
 
             if iteration % 10 == 0:
+                sys.stdout.flush()
                 print('[%d/%d][%d/%d] Loss_D: %.4f Loss_G: %.4f (recon = %.4f)' % 
                         (epoch, args.epoch, i, len(dataset), discrim_loss.get(), gen_loss.get(), gen_recon_loss.get()))
 
-            if iteration % 10 == 0:
+            if iteration % 50 == 0:
                 # TODO: output sentences
                 to_save_real = videos
                 to_save_fake = fake

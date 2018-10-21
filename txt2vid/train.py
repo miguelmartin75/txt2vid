@@ -15,12 +15,11 @@ import txt2vid.model as model
 #import txt2vid.videogan as model
 from txt2vid.model import SentenceEncoder
 
-from txt2vid.data import Vocab
 from util.log import status, warn, error
 
 FRAME_SIZE=64
 
-def load_data(video_dir=None, anno=None, vocab=None, batch_size=64, val=False, num_workers=4, num_channels=3, random_frames=0):
+def load_data(video_dir=None, anno=None, batch_size=64, val=False, num_workers=4, num_channels=3, random_frames=0):
     # TODO
     from data import get_loader
 
@@ -34,7 +33,7 @@ def load_data(video_dir=None, anno=None, vocab=None, batch_size=64, val=False, n
                                         transforms.ToTensor(),
                                         transforms.Normalize([0.5],[0.5])])
 
-    return get_loader(video_dir, anno, vocab, transform, batch_size, shuffle=not val, num_workers=num_workers, random_frames=random_frames)
+    return get_loader(video_dir, anno, transform, batch_size, shuffle=not val, num_workers=num_workers, random_frames=random_frames)
 
 def main(args):
     if args.seed is None:
@@ -59,9 +58,8 @@ def main(args):
     device = torch.device("cuda:0" if args.cuda else "cpu")
     ngpu = int(args.ngpu)
 
-    from util.pickle import load
-    vocab = load(args.vocab)
-    dataset = load_data(args.data, args.anno, vocab, batch_size=args.batch_size, val=False, num_workers=args.workers, num_channels=args.num_channels, random_frames=args.random_frames)
+    dataset = load_data(args.data, args.anno, batch_size=args.batch_size, val=False, num_workers=args.workers, num_channels=args.num_channels, random_frames=args.random_frames)
+    vocab = dataset.dataset.vocab
 
     # TODO: params
     txt_encoder = SentenceEncoder(embed_size=args.word_embed,
@@ -248,7 +246,6 @@ if __name__ == '__main__':
     parser.add_argument('--epoch', type=int, default=5, help='number of epochs to perform')
 
     parser.add_argument('--data', type=str, help='video directory', required=True)
-    parser.add_argument('--vocab', type=str, help='vocab location', required=True)
     parser.add_argument('--anno', type=str, help='annotation location', required=True)
     parser.add_argument('--batch_size', type=int, default=64, help='input batch size')
 
@@ -269,7 +266,7 @@ if __name__ == '__main__':
     parser.add_argument('--recon_lambda', type=float, default=0.1, help='Multiplier for reconstruction loss')
     parser.add_argument('--recon_l2', action='store_true', help='Use L2 loss for recon')
 
-    parser.add_argument('--use_normal_init', action='store_true', help='Use normal init')
+    parser.add_argument('--use_normal_init', type=int, default=0, help='Use normal init')
 
     parser.add_argument('--out', type=str, default='out', help='dir output path')
     parser.add_argument('--out_samples', type=str, default='out_samples', help='dir output path')

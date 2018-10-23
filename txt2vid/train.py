@@ -20,7 +20,7 @@ from util.pickle import load
 
 FRAME_SIZE=64
 
-def load_data(video_dir=None, anno=None, batch_size=64, val=False, num_workers=4, num_channels=3, random_frames=0):
+def load_data(video_dir=None, vocab=None, anno=None, batch_size=64, val=False, num_workers=4, num_channels=3, random_frames=0):
     # TODO
     from data import get_loader
 
@@ -34,7 +34,7 @@ def load_data(video_dir=None, anno=None, batch_size=64, val=False, num_workers=4
                                         transforms.ToTensor(),
                                         transforms.Normalize([0.5],[0.5])])
 
-    return get_loader(video_dir, anno, transform, batch_size, shuffle=not val, num_workers=num_workers, random_frames=random_frames)
+    return get_loader(video_dir, anno, vocab, transform, batch_size, shuffle=not val, num_workers=num_workers, random_frames=random_frames)
 
 def main(args):
     if args.seed is None:
@@ -59,16 +59,20 @@ def main(args):
     device = torch.device("cuda:0" if args.cuda else "cpu")
     ngpu = int(args.ngpu)
 
-    dataset = load_data(args.data, args.anno, batch_size=args.batch_size, val=False, num_workers=args.workers, num_channels=args.num_channels, random_frames=args.random_frames)
-
     vocab = load(args.vocab)
+    dataset = load_data(video_dir=args.data, anno=args.anno, vocab=vocab, batch_size=args.batch_size, val=False, num_workers=args.workers, num_channels=args.num_channels, random_frames=args.random_frames)
 
     # TODO: params
-    txt_encoder = SentenceEncoder(embed_size=args.word_embed,
-                                  hidden_size=args.hidden_state, 
-                                  encoding_size=args.sent_encode, 
-                                  num_layers=args.txt_layers, 
-                                  vocab_size=len(vocab)).to(device)
+    if args.sent_encode_path:
+        txt_encoder = torch.load(args.sent_encode_path)
+        if 'encoder' in txt_encoder:
+            txt_encoder = txt_encoder['encoder']
+    else:
+        txt_encoder = SentenceEncoder(embed_size=args.word_embed,
+                                      hidden_size=args.hidden_state, 
+                                      encoding_size=args.sent_encode, 
+                                      num_layers=args.txt_layers, 
+                                      vocab_size=len(vocab)).to(device)
 
     discrim = model.Discrim(txt_encode_size=txt_encoder.encoding_size,
                             num_channels=args.num_channels).to(device)
@@ -245,12 +249,14 @@ if __name__ == '__main__':
     parser.add_argument('--anno', type=str, help='annotation location', required=True)
     parser.add_argument('--batch_size', type=int, default=64, help='input batch size')
 
-    parser.add_argument('--lr', type=float, default=0.0001, help='learning rate, default=0.0002')
+    parser.add_argument('--lr', type=float, default=0.0002, help='learning rate')
     parser.add_argument('--beta1', type=float, default=0.9, help='beta1 for adam. default=0.5')
     parser.add_argument('--beta2', type=float, default=0.999, help='beta1 for adam. default=0.5')
     
     parser.add_argument('--gen_steps', type=int, default=1, help='Number of generator steps to use per iteration')
     parser.add_argument('--discrim_steps', type=int, default=1, help='Number of discriminator steps to use per iteration')
+
+    parser.add_argument('--sent_encode_path', type=str, default=None, help='Initial model for the sentence encoder')
 
     parser.add_argument('--word_embed', type=int, default=128, help='Dimensionality of each word (sentence model)')
     parser.add_argument('--hidden_state', type=int, default=256, help='Dimensionality of hidden state (sentence model)')

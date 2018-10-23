@@ -52,13 +52,13 @@ class SynthDataset(data.Dataset):
         self.video_dir = video_dir
         self.transform = transform
         self.random_frames = random_frames
+        self.vocab = vocab
 
         captions = load(captions)
 
         self.video_ids = []
         self.captions = []
         self.missing = 0
-        self.vocab = Vocab()
 
         for vid in captions:
             path = Path(self.get_video_path(vid))
@@ -67,9 +67,6 @@ class SynthDataset(data.Dataset):
                 continue
 
             for cap in captions[vid]:
-                for word in self.vocab.tokenize(cap):
-                    self.vocab.add_word(word)
-
                 self.video_ids.append(vid)
                 self.captions.append(cap)
 
@@ -240,7 +237,7 @@ def collate_fn(data):
         targets[i, :end] = cap[:end]        
     return vids, targets, lengths
 
-def get_loader(video_dir, captions, transform, batch_size, shuffle, num_workers, random_frames):
+def get_loader(video_dir, captions, vocab, transform, batch_size, shuffle, num_workers, random_frames):
     """Returns torch.utils.data.DataLoader for custom coco dataset."""
     dset = SynthDataset(video_dir=video_dir, captions=captions, transform=transform, random_frames=random_frames) 
 

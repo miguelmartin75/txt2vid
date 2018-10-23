@@ -18,19 +18,31 @@ class SentenceEncoder(nn.Module):
 
         self.apply(weights_init)
 
-    def forward(self, x, lengths, states=None):
+    def forward(self, x, lengths, initial_state=None):
         max_len = lengths[0]
         embeddings = self.embed(x)
 
         from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
         packed = pack_padded_sequence(embeddings, lengths, batch_first=True) 
-        packed_out, _ = self.ltsm(packed, states)
+        packed_out, _ = self.ltsm(packed, initial_state)
         out, _ = pad_packed_sequence(packed_out, batch_first=True, total_length=max_len)
 
         hn = out[:, -1, :]
 
         return self.to_vec(hn)
 
+    def create_initial_state(self):
+        # TODO
+        hidden = Variable(torch.zeros(self.n_layers, 1, self.hidden_size))
+        return hidden
+
+class SentenceDecoder(nn.Module):
+    def __init__(self, input_size=256, hidden_size=256, num_layers=6):
+        super().__init__()
+        self.main = nn.LSTM(input_size, hidden_size, num_layers, batch_first=True, bidirectional=False)
+
+    def forward(self, x, initial_state=None):
+        return self.main(x, initial_state)
 
 class Discrim(nn.Module):
 

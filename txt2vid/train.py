@@ -16,6 +16,7 @@ import txt2vid.model as model
 from txt2vid.model import SentenceEncoder
 
 from util.log import status, warn, error
+from util.pickle import load
 
 FRAME_SIZE=64
 
@@ -59,7 +60,8 @@ def main(args):
     ngpu = int(args.ngpu)
 
     dataset = load_data(args.data, args.anno, batch_size=args.batch_size, val=False, num_workers=args.workers, num_channels=args.num_channels, random_frames=args.random_frames)
-    vocab = dataset.dataset.vocab
+
+    vocab = load(args.vocab)
 
     # TODO: params
     txt_encoder = SentenceEncoder(embed_size=args.word_embed,

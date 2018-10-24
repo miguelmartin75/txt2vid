@@ -1,9 +1,10 @@
 import torch
 import torch.nn as nn
 import torch.nn.init as init
+import torch.nn.functional as F
 
 class SentenceEncoder(nn.Module):
-    def __init__(self, vocab_size=None, embed_size=256, hidden_size=256, encoding_size=256, num_layers=6):
+    def __init__(self, vocab_size=None, embed_size=128, hidden_size=256, encoding_size=256, num_layers=2):
         super().__init__()
 
         self.hidden_size = hidden_size
@@ -12,37 +13,62 @@ class SentenceEncoder(nn.Module):
         self.embed_size = embed_size
 
         self.embed = nn.Embedding(vocab_size, embed_size)
-        self.ltsm = nn.LSTM(embed_size, hidden_size, num_layers, batch_first=True, bidirectional=False)
+        self.lstm = nn.LSTM(embed_size, hidden_size, num_layers, batch_first=True, bidirectional=False)
 
-        self.to_vec = nn.Linear(hidden_size, encoding_size)
+        #self.to_vec = nn.Linear(hidden_size, encoding_size)
+        self.to_vocab = nn.Linear(hidden_size, vocab_size)
 
         self.apply(weights_init)
 
-    def forward(self, x, lengths, initial_state=None):
+    def forward(self, x, lengths=None, initial_state=None, raw_output=True):
         max_len = lengths[0]
         embeddings = self.embed(x)
 
         from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
         packed = pack_padded_sequence(embeddings, lengths, batch_first=True) 
-        packed_out, _ = self.ltsm(packed, initial_state)
-        out, _ = pad_packed_sequence(packed_out, batch_first=True, total_length=max_len)
+        out, hidden = self.lstm(packed, initial_state)
+        out, _ = pad_packed_sequence(out, batch_first=True, total_length=max_len)
 
         hn = out[:, -1, :]
+        if not raw_output:
+            out = self.to_vocab(out.squeeze(1))
 
-        return self.to_vec(hn)
+        return out, hidden, hn
+
+    # basically decode
+    def sample(self, true_inputs=None, initial_hidden=None, max_seq_len=60, teacher_force=False):
+        # bless this
+        # https://github.com/yunjey/pytorch-tutorial/blob/master/tutorials/03-advanced/image_captioning/model.py#L35
+        raw_outputs = []
+        symbols = []
+
+        inputs = true_inputs[:, 0].unsqueeze(1)
+        hidden = initial_hidden
+        assert inputs is not None
+
+        for i in range(max_seq_len):
+            inputs = self.embed(inputs)
+
+            outputs, hidden = self.lstm(inputs, hidden)
+            outputs = self.to_vocab(outputs.squeeze(1))
+            _, predicted = outputs.max(1)
+
+            raw_outputs.append(outputs)
+            symbols.append(predicted)
+
+            if teacher_force:
+                inputs = true_inputs[:, i].unsqueeze(1)
+            else:
+                inputs = predicted.unsqueeze(1)
+
+        raw_outputs = torch.stack(raw_outputs, 1)
+        symbols = torch.stack(symbols, 1)
+        return raw_outputs, symbols
 
     def create_initial_state(self):
         # TODO
         hidden = Variable(torch.zeros(self.n_layers, 1, self.hidden_size))
         return hidden
-
-class SentenceDecoder(nn.Module):
-    def __init__(self, input_size=256, hidden_size=256, num_layers=6):
-        super().__init__()
-        self.main = nn.LSTM(input_size, hidden_size, num_layers, batch_first=True, bidirectional=False)
-
-    def forward(self, x, initial_state=None):
-        return self.main(x, initial_state)
 
 class Discrim(nn.Module):
 
@@ -174,7 +200,7 @@ class Generator(nn.Module):
         return vids
 
 
-USE_NORMAL_INIT=False
+USE_NORMAL_INIT=True
 
 def weights_init(layer):
     name = layer.__class__.__name__

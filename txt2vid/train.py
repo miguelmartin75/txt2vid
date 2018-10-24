@@ -65,8 +65,8 @@ def main(args):
     # TODO: params
     if args.sent_encode_path:
         txt_encoder = torch.load(args.sent_encode_path)
-        if 'encoder' in txt_encoder:
-            txt_encoder = txt_encoder['encoder']
+        if 'txt' in txt_encoder:
+            txt_encoder = txt_encoder['txt']
     else:
         txt_encoder = SentenceEncoder(embed_size=args.word_embed,
                                       hidden_size=args.hidden_state, 

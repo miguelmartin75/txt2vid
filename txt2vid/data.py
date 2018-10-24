@@ -163,6 +163,7 @@ class Vocab(object):
         self.add_word(self.UNKNOWN)
 
     def add_word(self, word):
+        word = word.lower()
         if not word in self.word2idx:
             self.word2idx[word] = self.idx
             self.idx2word[self.idx] = word
@@ -172,6 +173,7 @@ class Vocab(object):
         return self.idx2word[idx]
 
     def __call__(self, word):
+        word = word.lower()
         if not word in self.word2idx:
             return self.word2idx[self.UNKNOWN]
         return self.word2idx[word]

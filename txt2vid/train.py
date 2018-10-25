@@ -102,10 +102,10 @@ def main(args):
 
     optimizerD = optim.Adam([ 
         { "params": discrim.parameters() }, 
+        { "params": txt_encoder.parameters() },
         { "params": frame_map.parameters() },
         { "params": frame_discrim.parameters() },
-        { "params": motion_discrim.parameters() },
-        { "params": txt_encoder.parameters() },
+        #{ "params": motion_discrim.parameters() },
     ], lr=args.lr, betas=(args.beta1, args.beta2), weight_decay=0.0005)
     optimizerG = optim.Adam([ 
         { "params": gen.parameters() }, 
@@ -118,8 +118,6 @@ def main(args):
 
     REAL_LABELS = torch.full((args.batch_size,), REAL_LABEL, device=device, dtype=torch.float, requires_grad=False)
     FAKE_LABELS = torch.full((args.batch_size,), FAKE_LABEL, device=device, dtype=torch.float, requires_grad=False)
-    REAL_LABELS = REAL_LABELS.view(REAL_LABELS.size(0), 1)
-    FAKE_LABELS = FAKE_LABELS.view(FAKE_LABELS.size(0), 1)
 
     criteria = nn.BCELoss()
     recon = nn.L1Loss()
@@ -251,6 +249,9 @@ def main(args):
     gen_recon_loss = RollingAvgLoss(window_size=LOSS_WINDOW_SIZE)
     discrim_loss = RollingAvgLoss(window_size=LOSS_WINDOW_SIZE)
 
+    REAL_LABELS_FRAMES = torch.full((32, args.batch_size), REAL_LABEL, device=device)
+    FAKE_LABELS_FRAMES = torch.full((32, args.batch_size), FAKE_LABEL, device=device)
+
     # TODO: when to backprop for txt_encoder
     for epoch in range(args.epoch):
         print('epoch=', epoch + 1)
@@ -265,10 +266,8 @@ def main(args):
             fake_labels = FAKE_LABELS[0:batch_size]
 
             num_frames = videos.size(2)
-            real_labels_frames = torch.full((num_frames, batch_size), REAL_LABEL).to(device)
-            fake_labels_frames = torch.full((num_frames, batch_size), FAKE_LABEL).to(device)
-
-            #print('cap=', vocab.to_words(captions[0]))
+            real_labels_frames = REAL_LABELS_FRAMES[:, 0:batch_size]
+            fake_labels_frames = FAKE_LABELS_FRAMES[:, 0:batch_size]
 
             _, _, cap_fv = txt_encoder(captions, lengths)
             latent = torch.randn(batch_size, SAMPLE_LATENT_SIZE, device=device)
@@ -276,6 +275,7 @@ def main(args):
             fake_inp = fake_inp.view(fake_inp.size(0), fake_inp.size(1), 1, 1, 1)
 
             fake = gen(fake_inp)
+            #fake_frames = real_frames = None
             fake_frames = frame_map(fake.detach())
             real_frames = frame_map(videos.detach())
 
@@ -283,7 +283,7 @@ def main(args):
             for j in range(DISCRIM_STEPS):
                 ld = discrim_step(videos=videos,
                                   frames=real_frames,
-                                  cap_fv=cap_fv, 
+                                  cap_fv=cap_fv,
                                   real_labels=real_labels, 
                                   fake_labels=fake_labels,
                                   real_labels_frames=real_labels_frames,
@@ -303,7 +303,7 @@ def main(args):
                     fake = gen(fake_inp)
 
                 lg, lgr = gen_step(fake=fake, 
-                                   fake_frames=fake_frames.detach(),
+                                   fake_frames=fake_frames,
                                    cap_fv=cap_fv,
                                    real_labels=real_labels,
                                    real_labels_frames=real_labels_frames,

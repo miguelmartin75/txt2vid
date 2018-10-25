@@ -138,7 +138,7 @@ class Discrim(nn.Module):
         vids_plus_sent = torch.cat((vids, sent), dim=1)
 
         pred = self.predictor(vids_plus_sent)
-        return pred.view(-1, 1)
+        return pred.view(-1, 1).squeeze(1)
 
 class MotionDiscrim(nn.Module):
     def __init__(self, txt_encode_size=256):

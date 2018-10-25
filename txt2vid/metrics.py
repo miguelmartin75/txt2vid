@@ -12,9 +12,11 @@ class RollingAvgLoss:
         self.cumsum += loss
         if len(self.loss_window) > self.window_size:
             self.cumsum -= self.loss_window[0]
+            del self.loss_window[0]
             self.loss_window.popleft()
 
     def get(self):
         assert len(self.loss_window) != 0
+        assert len(self.loss_window) <= self.window_size
         return self.cumsum / len(self.loss_window)
 

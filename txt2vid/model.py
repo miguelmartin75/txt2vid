@@ -127,7 +127,7 @@ class Discrim(nn.Module):
         sent = self.sent_map(sent)
         vids = self.vid(vids)
 
-        sent_temp = torch.zeros(vids.size(0), sent.size(1), vids.size(2), vids.size(3), vids.size(4)).to('cuda')
+        sent_temp = torch.zeros((vids.size(0), sent.size(1), vids.size(2), vids.size(3), vids.size(4)), device=device)
         for i in range(vids.size(2)):
             for j in range(vids.size(3)):
                 for k in range(vids.size(4)):
@@ -177,7 +177,7 @@ class MotionDiscrim(nn.Module):
             motion = motions[i, :, :, :, :]
             motion = self.motion_map(motion)
 
-            sent_dupe = torch.zeros(sent.size(0), sent.size(1), motion.size(2), motion.size(3)).to(device)
+            sent_dupe = torch.zeros((sent.size(0), sent.size(1), motion.size(2), motion.size(3)), device=device)
             for i in range(motion.size(2)):
                 for j in range(motion.size(3)):
                     sent_dupe[:, :, i, j] = sent
@@ -265,7 +265,7 @@ class FrameDiscrim(nn.Module):
             frame = frames[i, :, :, :, :]
             frame = self.frame_map(frame)
 
-            sent_dupe = torch.zeros(sent.size(0), sent.size(1), frame.size(2), frame.size(3)).to(device)
+            sent_dupe = torch.zeros(sent.size(0), sent.size(1), frame.size(2), frame.size(3), device=device)
             for i in range(frame.size(2)):
                 for j in range(frame.size(3)):
                     sent_dupe[:, :, i, j] = sent

@@ -3,6 +3,7 @@ import argparse
 import numpy as np
 
 import sys
+import gc
 
 import torch
 import torch.nn as nn
@@ -132,14 +133,14 @@ def main(args):
         gen.zero_grad()
         txt_encoder.zero_grad()
 
-        real_pred = discrim(vids=fake, sent=cap_fv)
+        real_pred = discrim(vids=fake, sent=cap_fv, device=device)
         loss_d0 = criteria(real_pred, real_labels)
 
-        discrim_frames = frame_discrim(fake_frames, sent=cap_fv, device=device)
+        discrim_frames = frame_discrim(fake_frames.detach(), sent=cap_fv, device=device)
         loss_d1 = criteria(discrim_frames, real_labels_frames)
 
         real_labels_motion = real_labels_frames[0:-1, :] # (time, batch)
-        motion_frames = motion_discrim(fake_frames, sent=cap_fv, device=device)
+        motion_frames = motion_discrim(fake_frames.detach(), sent=cap_fv, device=device)
         loss_d2 = criteria(motion_frames, real_labels_motion)
 
         loss = loss_d0 + loss_d1 + loss_d2
@@ -192,17 +193,17 @@ def main(args):
 
         loss_d1 = 0
         # real, correct sentence
-        real_pred = frame_discrim(frames.detach(), sent=cap_fv, device=device)
+        real_pred = frame_discrim(frames, sent=cap_fv, device=device)
         loss_frames_real_cc = criteria(real_pred, real_labels_frames)
         loss_d1 += loss_frames_real_cc
 
         # real, wrong sentence
-        real_pred = frame_discrim(frames.detach(), sent=incorrect_caps, device=device)
-        loss_frames_real_ic = criteria(real_pred, fake_labels_frames)
+        fake_pred = frame_discrim(frames, sent=incorrect_caps, device=device)
+        loss_frames_real_ic = criteria(fake_pred, fake_labels_frames)
         loss_d1 += loss_frames_real_ic
 
         # fake, correct sentence
-        fake_pred = frame_discrim(fake_frames.detach(), sent=cap_fv, device=device)
+        fake_pred = frame_discrim(fake_frames, sent=cap_fv, device=device)
         loss_frames_fake = criteria(fake_pred, fake_labels_frames)
         loss_d1 += loss_frames_fake
 
@@ -212,17 +213,17 @@ def main(args):
         fake_labels_motion = fake_labels_frames[0:-1, :]
 
         # real, correct sentence
-        real_pred = motion_discrim(frames.detach(), sent=cap_fv, device=device)
+        real_pred = motion_discrim(frames, sent=cap_fv, device=device)
         loss_motion_real_cc = criteria(real_pred, real_labels_motion)
         loss_d2 += loss_motion_real_cc
 
         # real, incorrect sentence
-        real_pred = motion_discrim(frames.detach(), sent=incorrect_caps, device=device)
+        real_pred = motion_discrim(frames, sent=incorrect_caps, device=device)
         loss_motion_real_ic = criteria(real_pred, fake_labels_motion)
         loss_d2 += loss_motion_real_ic
 
         # fake, correct sentence
-        fake_pred = motion_discrim(fake_frames.detach(), sent=cap_fv, device=device)
+        fake_pred = motion_discrim(fake_frames, sent=cap_fv, device=device)
         loss_motion_fake = criteria(fake_pred, fake_labels_motion)
         loss_d2 += loss_motion_fake
 
@@ -275,8 +276,8 @@ def main(args):
             fake_inp = fake_inp.view(fake_inp.size(0), fake_inp.size(1), 1, 1, 1)
 
             fake = gen(fake_inp)
-            fake_frames = frame_map(fake)
-            real_frames = frame_map(videos)
+            fake_frames = frame_map(fake.detach())
+            real_frames = frame_map(videos.detach())
 
             # discrim step
             for j in range(DISCRIM_STEPS):
@@ -293,6 +294,7 @@ def main(args):
                                   device=device)
                 discrim_loss.update(ld)
 
+            del cap_fv
             _, _, cap_fv = txt_encoder(captions, lengths)
 
             # generator
@@ -301,7 +303,7 @@ def main(args):
                     fake = gen(fake_inp)
 
                 lg, lgr = gen_step(fake=fake, 
-                                   fake_frames=fake_frames,
+                                   fake_frames=fake_frames.detach(),
                                    cap_fv=cap_fv,
                                    real_labels=real_labels,
                                    real_labels_frames=real_labels_frames,
@@ -326,6 +328,7 @@ def main(args):
                 torch.save(to_save, '%s/iter_%d_lossG_%.4f_lossD_%.4f' % (args.out, iteration, gen_loss.get(), discrim_loss.get()))
 
             if iteration % 10 == 0:
+                gc.collect()
                 sys.stdout.flush()
                 print('[%d/%d][%d/%d] Loss_D: %.4f Loss_G: %.4f (recon = %.4f)' % 
                         (epoch, args.epoch, i, len(dataset), discrim_loss.get(), gen_loss.get(), gen_recon_loss.get()))
@@ -347,6 +350,8 @@ def main(args):
                 #print(to_save_real.size())
                 vutils.save_image(to_save_real, '%s/real_samples.png' % args.out_samples, normalize=True, nrow=num_frames) #to_save_real.size(0))
                 vutils.save_image(to_save_fake, '%s/fake_samples_epoch_%03d_iter_%06d.png' % (args.out_samples, epoch, iteration), normalize=True, nrow=num_frames)#to_save_fake.size(0))
+
+                del to_save_fake
 
 
 

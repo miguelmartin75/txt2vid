@@ -141,11 +141,54 @@ class Discrim(nn.Module):
         return pred.view(-1, 1)
 
 class MotionDiscrim(nn.Module):
-    def __init__(self):
+    def __init__(self, txt_encode_size=256):
         super().__init__()
 
-    def forward(self, frames, sent=None):
-        motion = frames[:, 1:, :, :] - frames[:, 0:-1, :, :]
+        self.motion_map = nn.Sequential(
+            nn.Conv2d(512, 512, 1, 1, 0, bias=False),
+            nn.BatchNorm2d(512),
+            nn.LeakyReLU(0.2, True),
+        )
+
+        self.predictor = nn.Sequential(
+            nn.Conv2d(512 + txt_encode_size, 512, 1, 1, 0, bias=False),
+            nn.BatchNorm2d(512),
+            nn.LeakyReLU(0.2, True),
+
+            nn.Conv2d(512, 1, 4, 2, 0, bias=False),
+            nn.Sigmoid()
+        )
+
+        self.sent_map = nn.Sequential(
+            nn.Linear(txt_encode_size, txt_encode_size),
+            nn.BatchNorm1d(txt_encode_size),
+            nn.LeakyReLU(0.2, True)
+        )
+
+        self.apply(weights_init)
+
+    def forward(self, frames, sent=None, device=None):
+        sent = self.sent_map(sent)
+        motions = frames[1:] - frames[0:-1]
+
+        outputs = []
+        # loop through each motion 'frame'
+        for i in range(motions.size(0)): 
+            motion = motions[i, :, :, :, :]
+            motion = self.motion_map(motion)
+
+            sent_dupe = torch.zeros(sent.size(0), sent.size(1), motion.size(2), motion.size(3)).to(device)
+            for i in range(motion.size(2)):
+                for j in range(motion.size(3)):
+                    sent_dupe[:, :, i, j] = sent
+
+            motion_and_sent = torch.cat((motion, sent_dupe), dim=1)
+            output = self.predictor(motion_and_sent)
+            output = output.view(output.size(0), -1).squeeze(1)
+            outputs.append(output)
+
+        return torch.stack(outputs, 0).to(device)
+
 
 class FrameMap(nn.Module):
     def __init__(self, num_channels=3):
@@ -182,7 +225,6 @@ class FrameMap(nn.Module):
             frames_mapped.append(frame)
 
         frames = torch.stack(frames_mapped)
-        print(frames.size())
         return frames
 
 
@@ -190,36 +232,50 @@ class FrameDiscrim(nn.Module):
     def __init__(self, txt_encode_size=256):
         super().__init__()
 
+        self.frame_map = nn.Sequential(
+            nn.Conv2d(512, 512, 1, 1, 0, bias=False),
+            nn.BatchNorm2d(512),
+            nn.LeakyReLU(0.2, True),
+        )
+
         self.predictor = nn.Sequential(
             nn.Conv2d(512 + txt_encode_size, 512, 1, 1, 0, bias=False),
             nn.BatchNorm2d(512),
             nn.LeakyReLU(0.2, True),
 
-            nn.Conv2d(512, 1, (2, 4), 1, 0, bias=False),
+            nn.Conv2d(512, 1, 4, 2, 0, bias=False),
             nn.Sigmoid()
+        )
+
+        self.sent_map = nn.Sequential(
+            nn.Linear(txt_encode_size, txt_encode_size),
+            nn.BatchNorm1d(txt_encode_size),
+            nn.LeakyReLU(0.2, True)
         )
 
         self.apply(weights_init)
 
     def forward(self, frames, sent=None, device=None):
-        print('frames=', frames.size())
+        sent = self.sent_map(sent)
+
         outputs = []
-        for i in range(frames.size(1)):
-            frame = frames[:, i, :, :, :]
-            sent_dupe = torch.zeros(frame.size(0), sent.size(1), frame.size(2), frame.size(3)).to(device)
+        # input is frame x batch x ch x h x w
+        # loop through each frame
+        for i in range(frames.size(0)): 
+            frame = frames[i, :, :, :, :]
+            frame = self.frame_map(frame)
+
+            sent_dupe = torch.zeros(sent.size(0), sent.size(1), frame.size(2), frame.size(3)).to(device)
             for i in range(frame.size(2)):
                 for j in range(frame.size(3)):
-                    temp = sent_dupe[:, :, i, j]
-                    print('temp size=', temp.size())
-                    print('sent size=', sent.size())
                     sent_dupe[:, :, i, j] = sent
 
             frame_and_sent = torch.cat((frame, sent_dupe), dim=1)
             output = self.predictor(frame_and_sent)
-            print('out=', output.size())
+            output = output.view(output.size(0), -1).squeeze(1)
             outputs.append(output)
 
-        return torch.stack(outputs, 1).to(device)
+        return torch.stack(outputs, 0).to(device)
 
 class Generator(nn.Module):
     def __init__(self, latent_size=256, num_channels=1):

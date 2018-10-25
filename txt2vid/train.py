@@ -88,16 +88,28 @@ def main(args):
                             num_channels=args.num_channels).to(device)
     gen = model.Generator(latent_size=(txt_encoder.encoding_size + args.latent_size), 
                           num_channels=args.num_channels).to(device)
-    #frame_map = model.FrameMap(num_channels=args.num_channels).to(device)
-    #motion_discrim = model.MotionDiscrim().to(device)
-    #frame_discrim = model.FrameDiscrim(txt_encode_size=txt_encoder.encoding_size).to(device)
+    frame_map = model.FrameMap(num_channels=args.num_channels).to(device)
+    motion_discrim = model.MotionDiscrim(txt_encode_size=txt_encoder.encoding_size).to(device)
+    frame_discrim = model.FrameDiscrim(txt_encode_size=txt_encoder.encoding_size).to(device)
 
     print(discrim)
     print(gen)
     print(txt_encoder)
+    print(frame_map)
+    print(motion_discrim)
+    print(frame_discrim)
 
-    optimizerD = optim.Adam(discrim.parameters(), lr=args.lr, betas=(args.beta1, args.beta2), weight_decay=0.0005)
-    optimizerG = optim.Adam([ { "params": gen.parameters() }, { "params": txt_encoder.parameters(), "lr": 0.01 } ], lr=args.lr, betas=(args.beta1, args.beta2))
+    optimizerD = optim.Adam([ 
+        { "params": discrim.parameters() }, 
+        { "params": frame_map.parameters() },
+        { "params": frame_discrim.parameters() },
+        { "params": motion_discrim.parameters() },
+        { "params": txt_encoder.parameters() },
+    ], lr=args.lr, betas=(args.beta1, args.beta2), weight_decay=0.0005)
+    optimizerG = optim.Adam([ 
+        { "params": gen.parameters() }, 
+        { "params": txt_encoder.parameters() } 
+    ], lr=args.lr, betas=(args.beta1, args.beta2))
 
     REAL_LABEL = 1
     FAKE_LABEL = 0
@@ -116,19 +128,28 @@ def main(args):
     print("Vocab Size %d" % len(vocab))
     print("Dataset len= %d (%d batches)" % (len(dataset)*args.batch_size, len(dataset)))
 
-    def gen_step(fake=None, cap_fv=None, real_labels=None, last=True, real_videos=None):
+    def gen_step(fake=None, fake_frames=None, cap_fv=None, real_labels=None, real_labels_frames=None, last=True, real_videos=None):
         gen.zero_grad()
-        # TODO
-        #frame_map.zero_grad()
-        #frame_features = frame_map(fake)
-        #discrim_frames = frame_discrim(frame_features, sent=cap_fv, device=device)
-        #print('discrim_frames=', discrim_frames.size())
+        txt_encoder.zero_grad()
 
         real_pred = discrim(vids=fake, sent=cap_fv)
-        loss = criteria(real_pred, real_labels)
-        recon_loss = recon(fake, real_videos) 
-        if args.recon_lambda > 0:
-            loss += args.recon_lambda * recon_loss
+        loss_d0 = criteria(real_pred, real_labels)
+
+        discrim_frames = frame_discrim(fake_frames, sent=cap_fv, device=device)
+        loss_d1 = criteria(discrim_frames, real_labels_frames)
+
+        real_labels_motion = real_labels_frames[0:-1, :] # (time, batch)
+        motion_frames = motion_discrim(fake_frames, sent=cap_fv, device=device)
+        loss_d2 = criteria(motion_frames, real_labels_motion)
+
+        loss = loss_d0 + loss_d1 + loss_d2
+        loss /= 3.0
+
+        # don't think this is necessary
+        #recon_loss = recon(fake, real_videos) 
+        recon_loss = 0
+        #if args.recon_lambda > 0:
+        #    loss += args.recon_lambda * recon_loss
 
         loss.backward(retain_graph=not last)
 
@@ -136,32 +157,84 @@ def main(args):
 
         return loss, recon_loss
 
-    def discrim_step(videos=None, cap_fv=None, real_labels=None, fake_labels=None, last=True, fake=None):
+    def discrim_step(videos=None, frames=None, cap_fv=None, real_labels=None, fake_labels=None, real_labels_frames=None, fake_labels_frames=None, last=True, fake=None, fake_frames=None, device=None):
+
+        txt_encoder.zero_grad()
+        discrim.zero_grad()
+        frame_map.zero_grad()
+        motion_discrim.zero_grad()
+        frame_discrim.zero_grad()
+
         incorrect_caps = cap_fv[gen_perm(cap_fv.size(0))]
 
-        loss = 0
+        loss_d0 = 0
+        
+        # TODO: check
 
-        # real example, correct caption
-        real_pred = discrim(vids=videos, sent=cap_fv.detach(), device=device)
+        ## D_0 - video sentence pairs
+        # real example, correct caption - predict real
+        real_pred = discrim(vids=videos.detach(), sent=cap_fv, device=device)
         loss_discrim_real_cc = criteria(real_pred, real_labels)
-        loss += loss_discrim_real_cc
-        #loss_discrim_real_cc.backward(retain_graph=not last)
+        loss_d0 += loss_discrim_real_cc
 
         # real example, correct caption
-        real_pred = discrim(vids=videos, sent=incorrect_caps.detach(), device=device)
-        loss_discrim_real_ic = criteria(real_pred, fake_labels)
-        loss += loss_discrim_real_ic
-        #loss_discrim_real_ic.backward(retain_graph=not last)
+        # predict fake
+        fake_pred = discrim(vids=videos.detach(), sent=incorrect_caps, device=device)
+        loss_discrim_real_ic = criteria(fake_pred, fake_labels)
+        loss_d0 += loss_discrim_real_ic
 
         # fake example, correct caption
-        fake_pred = discrim(vids=fake.detach(), sent=cap_fv.detach(), device=device)
+        fake_pred = discrim(vids=fake.detach(), sent=cap_fv, device=device)
         loss_discrim_fake = criteria(fake_pred, fake_labels)
-        loss += loss_discrim_fake
-        #loss_discrim_fake.backward(retain_graph=not last)
+        loss_d0 += loss_discrim_fake
         
-        loss /= 3.0
-        loss.backward(retain_graph=not last)
+        ## D_1 - frame sentence pairs
 
+        loss_d1 = 0
+        # real, correct sentence
+        real_pred = frame_discrim(frames.detach(), sent=cap_fv, device=device)
+        loss_frames_real_cc = criteria(real_pred, real_labels_frames)
+        loss_d1 += loss_frames_real_cc
+
+        # real, wrong sentence
+        real_pred = frame_discrim(frames.detach(), sent=incorrect_caps, device=device)
+        loss_frames_real_ic = criteria(real_pred, fake_labels_frames)
+        loss_d1 += loss_frames_real_ic
+
+        # fake, correct sentence
+        fake_pred = frame_discrim(fake_frames.detach(), sent=cap_fv, device=device)
+        loss_frames_fake = criteria(fake_pred, fake_labels_frames)
+        loss_d1 += loss_frames_fake
+
+        ## D_2 - motion sentence pairs
+        loss_d2 = 0
+        real_labels_motion = real_labels_frames[0:-1, :] # (time, batch)
+        fake_labels_motion = fake_labels_frames[0:-1, :]
+
+        # real, correct sentence
+        real_pred = motion_discrim(frames.detach(), sent=cap_fv, device=device)
+        loss_motion_real_cc = criteria(real_pred, real_labels_motion)
+        loss_d2 += loss_motion_real_cc
+
+        # real, incorrect sentence
+        real_pred = motion_discrim(frames.detach(), sent=incorrect_caps, device=device)
+        loss_motion_real_ic = criteria(real_pred, fake_labels_motion)
+        loss_d2 += loss_motion_real_ic
+
+        # fake, correct sentence
+        fake_pred = motion_discrim(fake_frames.detach(), sent=cap_fv, device=device)
+        loss_motion_fake = criteria(fake_pred, fake_labels_motion)
+        loss_d2 += loss_motion_fake
+
+        # compute loss
+        loss_d0 /= 3.0
+        loss_d1 /= 3.0 # BCELoss already takes mean
+        loss_d2 /= 3.0 # BCELoss already takes mean
+
+        loss = loss_d0 + loss_d1 + loss_d2
+        loss /= 3.0
+
+        loss.backward(retain_graph=not last)
         optimizerD.step()
 
         return loss
@@ -190,10 +263,11 @@ def main(args):
             real_labels = REAL_LABELS[0:batch_size]
             fake_labels = FAKE_LABELS[0:batch_size]
 
-            #print('cap=', vocab.to_words(captions[0]))
+            num_frames = videos.size(2)
+            real_labels_frames = torch.full((num_frames, batch_size), REAL_LABEL).to(device)
+            fake_labels_frames = torch.full((num_frames, batch_size), FAKE_LABEL).to(device)
 
-            txt_encoder.zero_grad()
-            discrim.zero_grad()
+            #print('cap=', vocab.to_words(captions[0]))
 
             _, _, cap_fv = txt_encoder(captions, lengths)
             latent = torch.randn(batch_size, SAMPLE_LATENT_SIZE, device=device)
@@ -201,16 +275,25 @@ def main(args):
             fake_inp = fake_inp.view(fake_inp.size(0), fake_inp.size(1), 1, 1, 1)
 
             fake = gen(fake_inp)
+            fake_frames = frame_map(fake)
+            real_frames = frame_map(videos)
 
             # discrim step
             for j in range(DISCRIM_STEPS):
                 ld = discrim_step(videos=videos,
+                                  frames=real_frames,
                                   cap_fv=cap_fv, 
                                   real_labels=real_labels, 
                                   fake_labels=fake_labels,
+                                  real_labels_frames=real_labels_frames,
+                                  fake_labels_frames=fake_labels_frames,
                                   fake=fake,
-                                  last=(j == DISCRIM_STEPS - 1))
+                                  fake_frames=fake_frames,
+                                  last=(j == DISCRIM_STEPS - 1),
+                                  device=device)
                 discrim_loss.update(ld)
+
+            _, _, cap_fv = txt_encoder(captions, lengths)
 
             # generator
             for j in range(GEN_STEPS):
@@ -218,8 +301,10 @@ def main(args):
                     fake = gen(fake_inp)
 
                 lg, lgr = gen_step(fake=fake, 
+                                   fake_frames=fake_frames,
                                    cap_fv=cap_fv,
                                    real_labels=real_labels,
+                                   real_labels_frames=real_labels_frames,
                                    real_videos=videos,
                                    last=(j == GEN_STEPS - 1))
                 

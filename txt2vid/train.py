@@ -94,12 +94,6 @@ def main(args):
     motion_discrim = model.MotionDiscrim(txt_encode_size=txt_encoder.encoding_size).to(device)
     frame_discrim = model.FrameDiscrim(txt_encode_size=txt_encoder.encoding_size).to(device)
 
-    print(discrim)
-    print(gen)
-    print(txt_encoder)
-    print(frame_map)
-    print(motion_discrim)
-    print(frame_discrim)
 
     optimizerD = optim.Adam([ 
         { "params": discrim.parameters() }, 
@@ -112,6 +106,27 @@ def main(args):
         { "params": gen.parameters() }, 
         #{ "params": txt_encoder.parameters() } 
     ], lr=args.lr, betas=(args.beta1, args.beta2))
+
+    if args.model is not None:
+        to_load = torch.load(args.model)
+
+        gen.load_state_dict(to_load['gen'])
+
+        discrim.load_state_dict(to_load['discrim'])
+        frame_map.load_state_dict(to_load['frame_map'])
+        frame_discrim.load_state_dict(to_load['frame_map'])
+        motion_discrim.load_state_dict(to_load['motion_discrim'])
+
+        txt_encoder.load_state_dict(to_load['txt'])
+        optimizerD.load_state_dict(to_load['optD'])
+        optimizerG.load_state_dict(to_load['optG'])
+
+    print(discrim)
+    print(gen)
+    print(txt_encoder)
+    print(frame_map)
+    print(motion_discrim)
+    print(frame_discrim)
 
     REAL_LABEL = 1
     FAKE_LABEL = 0
@@ -327,6 +342,9 @@ def main(args):
                 to_save = {
                     'gen': gen.state_dict(),
                     'discrim': discrim.state_dict(),
+                    'frame_map': frame_map.state_dict(),
+                    'frame_discrim': frame_discrim.state_dict(),
+                    'motion_discrim': motion_discrim.state_dict(),
                     'txt': txt_encoder.state_dict(),
                     'optG': optimizerG.state_dict(),
                     'optD': optimizerD.state_dict()
@@ -375,6 +393,8 @@ if __name__ == '__main__':
     parser.add_argument('--workers', type=int, default=2, help='number of workers to help with loading/pre-processing data')
 
     parser.add_argument('--epoch', type=int, default=5, help='number of epochs to perform')
+
+    parser.add_argument('--model', type=str, help='pretrained model', default=None)
 
     parser.add_argument('--data', type=str, help='video directory', required=True)
     parser.add_argument('--anno', type=str, help='annotation location', required=True)

@@ -23,7 +23,7 @@ def main(args):
 if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument('--dir', type=str, default=None, help='location of videos')
+    parser.add_argument('--dir', type=str, default=None, help='location of videos', required=True)
 
     args = parser.parse_args()
 

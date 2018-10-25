@@ -21,7 +21,8 @@ from txt2vid.model import SentenceEncoder
 from util.log import status, warn, error
 from util.pickle import load
 
-FRAME_SIZE=64
+#FRAME_SIZE=64
+FRAME_SIZE=48
 
 def gen_perm(n):
     old_perm = np.array(range(n))
@@ -148,8 +149,9 @@ def main(args):
         loss /= 3.0
 
         # don't think this is necessary
-        recon_loss = recon(fake, real_videos) 
+        recon_loss = 0.0
         if args.recon_lambda > 0:
+            recon_loss = recon(fake, real_videos) 
             loss += args.recon_lambda * recon_loss
 
         loss.backward(retain_graph=not last)
@@ -247,13 +249,13 @@ def main(args):
 
     from txt2vid.metrics import RollingAvgLoss
 
-    LOSS_WINDOW_SIZE=20
+    LOSS_WINDOW_SIZE=50
     gen_loss = RollingAvgLoss(window_size=LOSS_WINDOW_SIZE)
     gen_recon_loss = RollingAvgLoss(window_size=LOSS_WINDOW_SIZE)
     discrim_loss = RollingAvgLoss(window_size=LOSS_WINDOW_SIZE)
 
-    REAL_LABELS_FRAMES = torch.full((32, args.batch_size), REAL_LABEL, device=device)
-    FAKE_LABELS_FRAMES = torch.full((32, args.batch_size), FAKE_LABEL, device=device)
+    REAL_LABELS_FRAMES = torch.full((16, args.batch_size), REAL_LABEL, device=device)
+    FAKE_LABELS_FRAMES = torch.full((16, args.batch_size), FAKE_LABEL, device=device)
 
     # TODO: when to backprop for txt_encoder
     for epoch in range(args.epoch):

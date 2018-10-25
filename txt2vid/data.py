@@ -102,9 +102,10 @@ class SynthDataset(data.Dataset):
         if self.random_frames == 0:
             new_frames = []
             # TODO: remove 32 constant
-            factor=int(len(frames)/32)
+            NUM_FRAMES = 16
+            factor=int(len(frames)/NUM_FRAMES)
             i = 0
-            while i < 32:
+            while i < NUM_FRAMES:
                 new_frames.append(frames[factor*i])
                 i += 1
             frames = new_frames

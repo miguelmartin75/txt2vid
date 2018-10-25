@@ -47,7 +47,7 @@ class SynthDataset(data.Dataset):
         return '%s/%s' % (self.video_dir, vid_id)
 
 
-    def __init__(self, video_dir=None, captions=None, transform=None, random_frames=0):
+    def __init__(self, video_dir=None, vocab=None, captions=None, transform=None, random_frames=0):
         from util.pickle import load
         self.video_dir = video_dir
         self.transform = transform
@@ -241,7 +241,7 @@ def collate_fn(data):
 
 def get_loader(video_dir, captions, vocab, transform, batch_size, shuffle, num_workers, random_frames):
     """Returns torch.utils.data.DataLoader for custom coco dataset."""
-    dset = SynthDataset(video_dir=video_dir, captions=captions, transform=transform, random_frames=random_frames) 
+    dset = SynthDataset(video_dir=video_dir, vocab=vocab, captions=captions, transform=transform, random_frames=random_frames) 
 
     data_loader = torch.utils.data.DataLoader(dataset=dset, 
                                               batch_size=batch_size,

@@ -1,5 +1,6 @@
 import random
 import argparse
+import numpy as np
 
 import sys
 
@@ -12,6 +13,7 @@ import torchvision.utils as vutils
 from torchvision import transforms
 
 import txt2vid.model as model
+from txt2vid.data import Vocab
 #import txt2vid.videogan as model
 from txt2vid.model import SentenceEncoder
 
@@ -19,6 +21,14 @@ from util.log import status, warn, error
 from util.pickle import load
 
 FRAME_SIZE=64
+
+def gen_perm(n):
+    old_perm = np.array(range(n))
+    new_perm = np.random.permutation(old_perm)
+    while (new_perm == old_perm).all():
+        new_perm = np.random.permutation(old_perm)
+    return new_perm
+
 
 def load_data(video_dir=None, vocab=None, anno=None, batch_size=64, val=False, num_workers=4, num_channels=3, random_frames=0):
     # TODO
@@ -66,7 +76,7 @@ def main(args):
     if args.sent_encode_path:
         txt_encoder = torch.load(args.sent_encode_path)
         if 'txt' in txt_encoder:
-            txt_encoder = txt_encoder['txt']
+            txt_encoder = txt_encoder['txt'].to(device)
     else:
         txt_encoder = SentenceEncoder(embed_size=args.word_embed,
                                       hidden_size=args.hidden_state, 
@@ -78,13 +88,16 @@ def main(args):
                             num_channels=args.num_channels).to(device)
     gen = model.Generator(latent_size=(txt_encoder.encoding_size + args.latent_size), 
                           num_channels=args.num_channels).to(device)
+    #frame_map = model.FrameMap(num_channels=args.num_channels).to(device)
+    #motion_discrim = model.MotionDiscrim().to(device)
+    #frame_discrim = model.FrameDiscrim(txt_encode_size=txt_encoder.encoding_size).to(device)
 
     print(discrim)
     print(gen)
     print(txt_encoder)
 
     optimizerD = optim.Adam(discrim.parameters(), lr=args.lr, betas=(args.beta1, args.beta2), weight_decay=0.0005)
-    optimizerG = optim.Adam([ { "params": gen.parameters() }, { "params": txt_encoder.parameters() } ], lr=args.lr, betas=(args.beta1, args.beta2))
+    optimizerG = optim.Adam([ { "params": gen.parameters() }, { "params": txt_encoder.parameters(), "lr": 0.01 } ], lr=args.lr, betas=(args.beta1, args.beta2))
 
     REAL_LABEL = 1
     FAKE_LABEL = 0
@@ -105,6 +118,11 @@ def main(args):
 
     def gen_step(fake=None, cap_fv=None, real_labels=None, last=True, real_videos=None):
         gen.zero_grad()
+        # TODO
+        #frame_map.zero_grad()
+        #frame_features = frame_map(fake)
+        #discrim_frames = frame_discrim(frame_features, sent=cap_fv, device=device)
+        #print('discrim_frames=', discrim_frames.size())
 
         real_pred = discrim(vids=fake, sent=cap_fv)
         loss = criteria(real_pred, real_labels)
@@ -119,21 +137,34 @@ def main(args):
         return loss, recon_loss
 
     def discrim_step(videos=None, cap_fv=None, real_labels=None, fake_labels=None, last=True, fake=None):
-        # real example
-        real_pred = discrim(vids=videos, sent=cap_fv.detach())
-        loss_discrim_real = criteria(real_pred, real_labels)
-        loss_discrim_real.backward(retain_graph=not last)
+        incorrect_caps = cap_fv[gen_perm(cap_fv.size(0))]
 
-        # fake example
-        fake_pred = discrim(vids=fake.detach(), sent=cap_fv.detach())
+        loss = 0
+
+        # real example, correct caption
+        real_pred = discrim(vids=videos, sent=cap_fv.detach(), device=device)
+        loss_discrim_real_cc = criteria(real_pred, real_labels)
+        loss += loss_discrim_real_cc
+        #loss_discrim_real_cc.backward(retain_graph=not last)
+
+        # real example, correct caption
+        real_pred = discrim(vids=videos, sent=incorrect_caps.detach(), device=device)
+        loss_discrim_real_ic = criteria(real_pred, fake_labels)
+        loss += loss_discrim_real_ic
+        #loss_discrim_real_ic.backward(retain_graph=not last)
+
+        # fake example, correct caption
+        fake_pred = discrim(vids=fake.detach(), sent=cap_fv.detach(), device=device)
         loss_discrim_fake = criteria(fake_pred, fake_labels)
-        loss_discrim_fake.backward(retain_graph=not last)
+        loss += loss_discrim_fake
+        #loss_discrim_fake.backward(retain_graph=not last)
         
-        loss_discrim = loss_discrim_real + loss_discrim_fake
+        loss /= 3.0
+        loss.backward(retain_graph=not last)
 
         optimizerD.step()
 
-        return loss_discrim
+        return loss
 
     
     DISCRIM_STEPS = args.discrim_steps
@@ -141,7 +172,7 @@ def main(args):
 
     from txt2vid.metrics import RollingAvgLoss
 
-    LOSS_WINDOW_SIZE=100
+    LOSS_WINDOW_SIZE=20
     gen_loss = RollingAvgLoss(window_size=LOSS_WINDOW_SIZE)
     gen_recon_loss = RollingAvgLoss(window_size=LOSS_WINDOW_SIZE)
     discrim_loss = RollingAvgLoss(window_size=LOSS_WINDOW_SIZE)
@@ -164,7 +195,7 @@ def main(args):
             txt_encoder.zero_grad()
             discrim.zero_grad()
 
-            cap_fv = txt_encoder(captions, lengths)
+            _, _, cap_fv = txt_encoder(captions, lengths)
             latent = torch.randn(batch_size, SAMPLE_LATENT_SIZE, device=device)
             fake_inp = torch.cat((cap_fv.detach(), latent), dim=1)
             fake_inp = fake_inp.view(fake_inp.size(0), fake_inp.size(1), 1, 1, 1)
@@ -247,6 +278,7 @@ if __name__ == '__main__':
 
     parser.add_argument('--data', type=str, help='video directory', required=True)
     parser.add_argument('--anno', type=str, help='annotation location', required=True)
+    parser.add_argument('--vocab', type=str, help='vocab location', required=True)
     parser.add_argument('--batch_size', type=int, default=64, help='input batch size')
 
     parser.add_argument('--lr', type=float, default=0.0002, help='learning rate')

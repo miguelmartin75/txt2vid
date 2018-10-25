@@ -92,8 +92,6 @@ class Discrim(nn.Module):
             nn.BatchNorm3d(512),
             nn.LeakyReLU(0.2, True),
 
-            nn.Conv3d(512, 1, (2, 4, 4), 1, 0, bias=False), # 512
-            nn.Sigmoid()
 
             #nn.BatchNorm3d(1024),
             #nn.LeakyReLU(0.2, True),
@@ -103,35 +101,125 @@ class Discrim(nn.Module):
             #nn.LeakyReLU(0.2, True),
         )
 
-        #self.predictor = nn.Sequential(
+        self.sent_map = nn.Sequential(
+            nn.Linear(txt_encode_size, txt_encode_size),
+            nn.BatchNorm1d(txt_encode_size),
+            nn.LeakyReLU(0.2, True)
+        )
+
+        self.predictor = nn.Sequential(
+            nn.Conv3d(512 + txt_encode_size, 512, (1,1,1), 1, 0, bias=False),
+            nn.BatchNorm3d(512),
+            nn.LeakyReLU(0.2, True),
+            nn.Conv3d(512, 1, (2, 4, 4), 1, 0, bias=False),
+            nn.Sigmoid()
         #    nn.Linear(txt_encode_size*2, txt_encode_size),
         #    nn.BatchNorm1d(txt_encode_size),
         #    nn.LeakyReLU(0.2, True),
         #    nn.Linear(txt_encode_size, 1),
 
         #    nn.Sigmoid() 
-        #)
+        )
 
         self.apply(weights_init)
 
-    def forward(self, vids=None, sent=None):
-        #vids = self.vid(vids)
-        #return vids.view(vids.size(0), -1)
-
+    def forward(self, vids=None, sent=None, device=None):
+        sent = self.sent_map(sent)
         vids = self.vid(vids)
-        return vids
 
-        #print(vids.size())
+        sent_temp = torch.zeros(vids.size(0), sent.size(1), vids.size(2), vids.size(3), vids.size(4)).to('cuda')
+        for i in range(vids.size(2)):
+            for j in range(vids.size(3)):
+                for k in range(vids.size(4)):
+                    sent_temp[:, :, i, j, k] = sent
 
-        # flatten
-        #vids = vids.view(vids.size(0), -1)
-        #sent = sent.view(sent.size(0), -1)
+        sent = sent_temp
 
-        ## concat img + sentence
-        #vids_plus_sent = torch.cat((vids, sent), dim=1)
+        vids_plus_sent = torch.cat((vids, sent), dim=1)
 
-        ## predict
-        #return self.predictor(vids_plus_sent)
+        pred = self.predictor(vids_plus_sent)
+        return pred.view(-1, 1)
+
+class MotionDiscrim(nn.Module):
+    def __init__(self):
+        super().__init__()
+
+    def forward(self, frames, sent=None):
+        motion = frames[:, 1:, :, :] - frames[:, 0:-1, :, :]
+
+class FrameMap(nn.Module):
+    def __init__(self, num_channels=3):
+        super().__init__()
+
+        self.frame_map = nn.Sequential(
+            nn.Conv2d(num_channels, 64, 4, 2, 1, bias=False),
+            nn.BatchNorm2d(64),
+            nn.LeakyReLU(0.2, True),
+
+            nn.Conv2d(64, 128, 4, 2, 1, bias=False),
+            nn.BatchNorm2d(128),
+            nn.LeakyReLU(0.2, True),
+
+            nn.Conv2d(128, 256, 4, 2, 1, bias=False),
+            nn.BatchNorm2d(256),
+            nn.LeakyReLU(0.2, True),
+
+            nn.Conv2d(256, 512, 4, 2, 1, bias=False),
+            nn.BatchNorm2d(512),
+            nn.LeakyReLU(0.2, True),
+        )
+
+        self.apply(weights_init)
+
+
+    def forward(self, videos):
+        frames = videos.permute(0, 2, 1, 3, 4)
+
+        frames_mapped = []
+        for i in range(frames.size(1)):
+            frame = frames[:, i, :, :, :]
+            frame = self.frame_map(frame)
+            frames_mapped.append(frame)
+
+        frames = torch.stack(frames_mapped)
+        print(frames.size())
+        return frames
+
+
+class FrameDiscrim(nn.Module):
+    def __init__(self, txt_encode_size=256):
+        super().__init__()
+
+        self.predictor = nn.Sequential(
+            nn.Conv2d(512 + txt_encode_size, 512, 1, 1, 0, bias=False),
+            nn.BatchNorm2d(512),
+            nn.LeakyReLU(0.2, True),
+
+            nn.Conv2d(512, 1, (2, 4), 1, 0, bias=False),
+            nn.Sigmoid()
+        )
+
+        self.apply(weights_init)
+
+    def forward(self, frames, sent=None, device=None):
+        print('frames=', frames.size())
+        outputs = []
+        for i in range(frames.size(1)):
+            frame = frames[:, i, :, :, :]
+            sent_dupe = torch.zeros(frame.size(0), sent.size(1), frame.size(2), frame.size(3)).to(device)
+            for i in range(frame.size(2)):
+                for j in range(frame.size(3)):
+                    temp = sent_dupe[:, :, i, j]
+                    print('temp size=', temp.size())
+                    print('sent size=', sent.size())
+                    sent_dupe[:, :, i, j] = sent
+
+            frame_and_sent = torch.cat((frame, sent_dupe), dim=1)
+            output = self.predictor(frame_and_sent)
+            print('out=', output.size())
+            outputs.append(output)
+
+        return torch.stack(outputs, 1).to(device)
 
 class Generator(nn.Module):
     def __init__(self, latent_size=256, num_channels=1):

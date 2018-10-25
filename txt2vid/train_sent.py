@@ -48,6 +48,8 @@ def collate_fn(data):
     return targets, lengths
 
 def eval(split, seq2seq, device, vocab, debug=False):
+    seq2seq.eval() # switch to eval
+
     criteria = nn.CrossEntropyLoss(reduction='sum')
     loss = 0
     num_examples = 0
@@ -78,6 +80,7 @@ def eval(split, seq2seq, device, vocab, debug=False):
             loss += temp
             num_examples += batch_size
 
+    seq2seq.train() # switch to train mode
     return loss / num_examples
 
 def main(args):
@@ -152,6 +155,8 @@ def main(args):
     criteria = nn.CrossEntropyLoss()
 
     writer = SummaryWriter()
+
+    print("Teacher force prob = %.4f" % (args.teacher_force))
 
     iteration = 0
     val_loss = -1

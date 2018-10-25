@@ -178,6 +178,7 @@ class MotionDiscrim(nn.Module):
             motion = self.motion_map(motion)
 
             sent_dupe = torch.zeros((sent.size(0), sent.size(1), motion.size(2), motion.size(3)), device=device)
+
             for i in range(motion.size(2)):
                 for j in range(motion.size(3)):
                     sent_dupe[:, :, i, j] = sent
@@ -266,10 +267,13 @@ class FrameDiscrim(nn.Module):
             frame = self.frame_map(frame)
 
             sent_dupe = torch.zeros(sent.size(0), sent.size(1), frame.size(2), frame.size(3), device=device)
+
             for i in range(frame.size(2)):
                 for j in range(frame.size(3)):
                     sent_dupe[:, :, i, j] = sent
 
+            #print('frame=', frame.size())
+            #print('sent=', sent_dupe.size())
             frame_and_sent = torch.cat((frame, sent_dupe), dim=1)
             output = self.predictor(frame_and_sent)
             output = output.view(output.size(0), -1).squeeze(1)

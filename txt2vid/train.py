@@ -105,7 +105,7 @@ def main(args):
         { "params": txt_encoder.parameters() },
         { "params": frame_map.parameters() },
         { "params": frame_discrim.parameters() },
-        #{ "params": motion_discrim.parameters() },
+        { "params": motion_discrim.parameters() },
     ], lr=args.lr, betas=(args.beta1, args.beta2), weight_decay=0.0005)
     optimizerG = optim.Adam([ 
         { "params": gen.parameters() }, 
@@ -292,7 +292,7 @@ def main(args):
                                   fake_frames=fake_frames,
                                   last=(j == DISCRIM_STEPS - 1),
                                   device=device)
-                discrim_loss.update(ld)
+                discrim_loss.update(float(ld))
 
             del cap_fv
             _, _, cap_fv = txt_encoder(captions, lengths)
@@ -310,22 +310,25 @@ def main(args):
                                    real_videos=videos,
                                    last=(j == GEN_STEPS - 1))
                 
-                gen_loss.update(lg)
-                gen_recon_loss.update(lgr)
+                gen_loss.update(float(lg))
+                gen_recon_loss.update(float(lgr))
 
             iteration = epoch*len(dataset) + i
 
             if iteration != 0 and iteration % 100 == 0:
                 
                 to_save = {
-                    'gen': gen,
-                    'discrim': discrim,
-                    'txt': txt_encoder,
-                    'optG': optimizerG,
-                    'optD': optimizerD
+                    'gen': gen.state_dict(),
+                    'discrim': discrim.state_dict(),
+                    'txt': txt_encoder.state_dict(),
+                    'optG': optimizerG.state_dict(),
+                    'optD': optimizerD.state_dict()
                 }
 
                 torch.save(to_save, '%s/iter_%d_lossG_%.4f_lossD_%.4f' % (args.out, iteration, gen_loss.get(), discrim_loss.get()))
+
+                del to_save
+                to_save = None
 
             if iteration % 10 == 0:
                 gc.collect()

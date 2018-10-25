@@ -3,10 +3,10 @@
 # Configure the resources required
 #SBATCH -p batch                                                # partition (this is the queue your job will be added to)
 #SBATCH -n 1              	                                # number of tasks (sequential job starts 1 task) (check this if your job unexpectedly uses 2 nodes)
-#SBATCH -c 4              	                                # number of cores (sequential job calls a multi-thread program that uses 8 cores)
+#SBATCH -c 8              	                                # number of cores (sequential job calls a multi-thread program that uses 8 cores)
 #SBATCH --time=1-00:00:00                                         # time allocation, which has the format (D-HH:MM), here set to 1 hour
 #SBATCH --gres=gpu:kepler:1                                            # generic resource required (here requires 4 GPUs)
-#SBATCH --mem=16GB # specify memory required per node (here set to 16 GB)
+#SBATCH --mem=32GB # specify memory required per node (here set to 16 GB)
 
 # Configure notifications 
 #SBATCH --mail-type=END                                         # Type of email notifications will be sent (here set to END, which means an email will be sent when the job is done)

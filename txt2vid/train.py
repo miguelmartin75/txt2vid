@@ -255,6 +255,7 @@ def main(args):
     # TODO: when to backprop for txt_encoder
     for epoch in range(args.epoch):
         print('epoch=', epoch + 1)
+        sys.stdout.flush()
 
         for i, (videos, captions, lengths) in enumerate(dataset):
             # TODO: hyper-params for GAN training

@@ -92,8 +92,8 @@ def generate_examples(video_dir, sentence_out, num_examples=10, fps=None, frame_
             #animation_length = random.randint(int(0.1*num_frames), num_frames/2)
 
 
-        horizontal = False#random.randint(0, 1) # horiz or vert
-        l2r_u2d = True#random.randint(0, 1) # if false, go reverse
+        horizontal = random.randint(0, 1) # horiz or vert
+        l2r_u2d = random.randint(0, 1) # if false, go reverse
         use_corners = False#random.randint(0, 1) # should we use corners or not
 
         a = None # from position
@@ -106,7 +106,7 @@ def generate_examples(video_dir, sentence_out, num_examples=10, fps=None, frame_
         #else:
         #    sentence += 'moves '
 
-        sentence += 'is'
+        sentence += 'is '
 
         if use_corners:
             i1 = np.random.randint(0, len(corners))
@@ -156,7 +156,7 @@ def generate_examples(video_dir, sentence_out, num_examples=10, fps=None, frame_
                 if l2r_u2d:
                     sentence += 'top and bottom'
                 else:
-                    sentence += 'bottom and to'
+                    sentence += 'bottom and top'
 
             if not l2r_u2d:
                 a, b = b, a

@@ -114,7 +114,7 @@ def main(args):
 
         discrim.load_state_dict(to_load['discrim'])
         frame_map.load_state_dict(to_load['frame_map'])
-        frame_discrim.load_state_dict(to_load['frame_map'])
+        frame_discrim.load_state_dict(to_load['frame_discrim'])
         motion_discrim.load_state_dict(to_load['motion_discrim'])
 
         txt_encoder.load_state_dict(to_load['txt'])

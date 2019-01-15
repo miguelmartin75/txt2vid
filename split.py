@@ -2,7 +2,7 @@ import random
 from pathlib import Path
 from shutil import copy
 
-path = Path('../data/cooking_clips')
+path = Path('../cooking_videos')
 
 def get_videos(directory):
     for video in directory.iterdir():

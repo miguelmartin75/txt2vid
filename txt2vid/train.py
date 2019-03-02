@@ -143,31 +143,43 @@ def main(args):
     print("Vocab Size %d" % len(vocab))
     print("Dataset len= %d (%d batches)" % (len(dataset)*args.batch_size, len(dataset)))
 
-    def gen_step(fake=None, fake_frames=None, cap_fv=None, real_labels=None, real_labels_frames=None, last=True, real_videos=None):
+    def discrim_forward(discrim=None, real_x=None, fake_x=None, correct_captions=None, incorrect_captions=None):
+        # real, correct captions => should predict "REAL"
+        real_cc = discrim(real_x, correct_captions)
+        # real, incorrect captions => should predict "FAKE"
+        real_ic = discrim(real_x, incorrect_captions)
+        # fake, correct captions => should predict "FAKE"
+        fake_cc = discrim(fake_x, correct_captions)
+
+        real_pred = real_cc
+        fake_pred = torch.cat((real_ic, fake_cc), dim=1)
+        loss = -(torch.mean(real_pred) - torch.mean(fake_pred))
+        return loss
+
+    def gen_step(nsteps=1, fake=None, fake_frames=None, cap_fv=None, real_labels=None, real_labels_frames=None, last=True, real_videos=None):
         gen.zero_grad()
         txt_encoder.zero_grad()
 
-        loss_d0 = 0.0
-        real_pred = discrim(vids=fake, sent=cap_fv, device=device)
-        loss_d0 = criteria(real_pred, real_labels)
+        # ============
+        # forward fake with correct captions
+        # should all aim to fool discrim, i.e. predict "REAL"
+        # ============
 
-        loss_d1 = 0.0
-        discrim_frames = frame_discrim(fake_frames, sent=cap_fv, device=device)
-        loss_d1 = criteria(discrim_frames, real_labels_frames)
-
-        loss_d2 = 0.0
         real_labels_motion = real_labels_frames[0:-1, :] # (time, batch)
-        motion_frames = motion_discrim(fake_frames, sent=cap_fv, device=device)
-        loss_d2 = criteria(motion_frames, real_labels_motion)
 
-        loss = loss_d0 + loss_d1 + loss_d2
-        loss /= 3.0
+        real_vids = discrim(vids=fake, sent=cap_fv, device=device)
+        real_frames = frame_discrim(fake_frames, sent=cap_fv, device=device)
+        real_motion = motion_discrim(fake_frames, sent=cap_fv, device=device)
+
+        real = torch.cat((real_vids, real_frames, real_motion), dim=1)
+        loss = -torch.mean(real) / nsteps
 
         # don't think this is necessary
         recon_loss = 0.0
         if args.recon_lambda > 0:
-            recon_loss = recon(fake, real_videos) 
-            loss += args.recon_lambda * recon_loss
+            recon_loss = recon(fake, real_videos) * args.recon_lambda
+            recon_loss /= nsteps
+            loss += recon_loss
 
         loss.backward(retain_graph=not last)
 
@@ -175,10 +187,7 @@ def main(args):
 
         return loss, recon_loss
 
-    def discrim_forward(discrim=None, real_x=None, fake_x=None, correct_captions=None, incorrect_captions=None):
-        pass
-
-    def discrim_step(nsteps=1, videos=None, frames=None, cap_fv=None, real_labels=None, fake_labels=None, real_labels_frames=None, fake_labels_frames=None, last=True, fake=None, fake_frames=None, device=None):
+    def discrim_step(nsteps=1, videos=None, cap_fv=None, real_labels=None, fake_labels=None, real_labels_frames=None, fake_labels_frames=None, last=True, fake=None, device=None):
 
         txt_encoder.zero_grad()
         discrim.zero_grad()
@@ -188,12 +197,15 @@ def main(args):
 
         incorrect_caps = cap_fv[gen_perm(cap_fv.size(0))]
 
+        real_labels_motion = real_labels_frames[0:-1, :] # (time, batch)
+        fake_labels_motion = fake_labels_frames[0:-1, :]
+
         fake_frames = frame_map(fake.detach())
         frames = frame_map(videos.detach())
 
         loss_d0 = discrim_forward(discrim=discrim, real_x=videos.detach(), fake_x=fake.detach(), correct_captions=cap_fv, incorrect_captions=incorrect_captions)
-        loss_d1 = discrim_forward(discrim=frame_discrim, real_x=frames, fake_x=fake_frames, correct_captions=cap_fv, incorrect_captions=incorrect_captions)
-        loss_d2 = discrim_forward(discrim=motion_discrim, real_x=frames, fake_x=fake_frames, correct_captions=cap_fv, incorrect_captions=incorrect_captions)
+        loss_d1 = discrim_forward(discrim=frame_discrim, real_x=frames, fake_x=fake_frames, correct_captions=real_labels_frames, incorrect_captions=fake_labels_frames)
+        loss_d2 = discrim_forward(discrim=motion_discrim, real_x=frames, fake_x=fake_frames, correct_captions=real_labels_motion, incorrect_captions=fake_labels_motion)
 
         loss = torch.mean([loss_d0, loss_d1, loss_d2]) / nsteps
         loss.backward(retain_graph=not last)
@@ -243,15 +255,14 @@ def main(args):
             # discrim step
             total_discrim_loss = 0
             for j in range(DISCRIM_STEPS):
-                ld = discrim_step(videos=videos,
-                                  #frames=real_frames,
+                ld = discrim_step(nsteps=DISCRIM_STEPS, 
+                                  videos=videos,
                                   cap_fv=cap_fv,
                                   real_labels=real_labels, 
                                   fake_labels=fake_labels,
                                   real_labels_frames=real_labels_frames,
                                   fake_labels_frames=fake_labels_frames,
                                   fake=fake.detach(),
-                                  #fake_frames=fake_frames,
                                   last=(j == DISCRIM_STEPS - 1),
                                   device=device)
                 total_discrim_loss = ld

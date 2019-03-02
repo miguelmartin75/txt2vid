@@ -405,7 +405,7 @@ if __name__ == '__main__':
     parser.add_argument('--beta2', type=float, default=0.999, help='beta1 for adam. default=0.5')
     
     parser.add_argument('--gen_steps', type=int, default=1, help='Number of generator steps to use per iteration')
-    parser.add_argument('--discrim_steps', type=int, default=1, help='Number of discriminator steps to use per iteration')
+    parser.add_argument('--discrim_steps', type=int, default=5, help='Number of discriminator steps to use per iteration')
 
     parser.add_argument('--sent_encode_path', type=str, default=None, help='Initial model for the sentence encoder')
 
@@ -426,6 +426,8 @@ if __name__ == '__main__':
 
     parser.add_argument('--num_channels', type=int, default=1, help='number of channels in input')
     parser.add_argument('--random_frames', type=int, default=0, help='use random frames')
+
+    parser.add_argument('--lambda', type=float, default=10, help='gradient penalty')
 
     args = parser.parse_args()
     main(args)

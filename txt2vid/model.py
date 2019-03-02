@@ -129,6 +129,7 @@ class Discrim(nn.Module):
                     sent_temp[:, :, i, j, k] = sent
 
         sent = sent_temp
+        print('vids=', vids.shape())
         vids_plus_sent = torch.cat((vids, sent), dim=1)
 
         pred = self.predictor(vids_plus_sent)

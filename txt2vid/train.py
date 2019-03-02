@@ -72,6 +72,7 @@ def main(args):
     ngpu = int(args.ngpu)
 
     vocab = load(args.vocab)
+    print(args.data)
     dataset = load_data(video_dir=args.data, anno=args.anno, vocab=vocab, batch_size=args.batch_size, val=False, num_workers=args.workers, num_channels=args.num_channels, random_frames=args.random_frames)
 
     # TODO: params
@@ -195,7 +196,7 @@ def main(args):
         motion_discrim.zero_grad()
         frame_discrim.zero_grad()
 
-        incorrect_caps = cap_fv[gen_perm(cap_fv.size(0))]
+        incorrect_captions = cap_fv[gen_perm(cap_fv.size(0))]
 
         real_labels_motion = real_labels_frames[0:-1, :] # (time, batch)
         fake_labels_motion = fake_labels_frames[0:-1, :]
@@ -204,8 +205,8 @@ def main(args):
         frames = frame_map(videos.detach())
 
         loss_d0 = discrim_forward(discrim=discrim, real_x=videos.detach(), fake_x=fake.detach(), correct_captions=cap_fv, incorrect_captions=incorrect_captions)
-        loss_d1 = discrim_forward(discrim=frame_discrim, real_x=frames, fake_x=fake_frames, correct_captions=real_labels_frames, incorrect_captions=fake_labels_frames)
-        loss_d2 = discrim_forward(discrim=motion_discrim, real_x=frames, fake_x=fake_frames, correct_captions=real_labels_motion, incorrect_captions=fake_labels_motion)
+        loss_d1 = discrim_forward(discrim=frame_discrim, real_x=frames, fake_x=fake_frames, correct_captions=cap_fv, incorrect_captions=incorrect_captions)
+        loss_d2 = discrim_forward(discrim=motion_discrim, real_x=frames, fake_x=fake_frames, correct_captions=cap_fv, incorrect_captions=incorrect_captions)
 
         loss = torch.mean([loss_d0, loss_d1, loss_d2]) / nsteps
         loss.backward(retain_graph=not last)
@@ -267,6 +268,7 @@ def main(args):
                                   device=device)
                 total_discrim_loss = ld
 
+            optimizerD.step()
             discrim_loss.update(float(total_discrim_loss))
 
             #_, _, cap_fv = txt_encoder(captions, lengths)
@@ -275,21 +277,27 @@ def main(args):
             fake_frames = frame_map(fake)
 
             # generator
+            total_g_loss = 0
+            total_g_loss_recon = 0
             for j in range(GEN_STEPS):
                 if j != 0:
                     fake = gen(fake_inp)
 
-                lg, lgr = gen_step(fake=fake, 
+                lg, lgr = gen_step(nstep=nsteps, 
+                                   fake=fake, 
                                    fake_frames=fake_frames,
                                    cap_fv=cap_fv,
                                    real_labels=real_labels,
                                    real_labels_frames=real_labels_frames,
                                    real_videos=videos,
                                    last=(j == GEN_STEPS - 1))
+                total_g_loss += lg
+                total_g_loss_recon += lgr
                 
-                gen_loss.update(float(lg))
-                gen_recon_loss.update(float(lgr))
+            gen_loss.update(float(total_g_loss))
+            gen_recon_loss.update(float(total_g_loss_recon))
 
+            optimizerG.step()
             iteration = epoch*len(dataset) + i
 
             if iteration != 0 and iteration % 100 == 0:

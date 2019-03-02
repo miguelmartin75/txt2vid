@@ -9,3 +9,6 @@ client_secrets.json
 *_LOCAL_*
 *_REMOTE_*
 *.orig
+*.swm
+*.swn
+*.swl

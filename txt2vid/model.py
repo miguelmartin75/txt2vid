@@ -113,7 +113,7 @@ class Discrim(nn.Module):
             nn.BatchNorm3d(512),
             nn.LeakyReLU(0.2, True),
             nn.Conv3d(512, 1, (1, 2, 2), (1, 2, 2), 0, bias=False),
-            nn.Sigmoid()
+            #nn.Sigmoid()
         )
 
         self.apply(weights_init)
@@ -151,7 +151,7 @@ class MotionDiscrim(nn.Module):
             nn.LeakyReLU(0.2, True),
 
             nn.Conv2d(512, 1, 2, 2, 0, bias=False),
-            nn.Sigmoid()
+            #nn.Sigmoid()
         )
 
         self.sent_map = nn.Sequential(
@@ -240,7 +240,7 @@ class FrameDiscrim(nn.Module):
             nn.LeakyReLU(0.2, True),
 
             nn.Conv2d(512, 1, 2, 2, 0, bias=False),
-            nn.Sigmoid()
+            #nn.Sigmoid()
         )
 
         self.sent_map = nn.Sequential(

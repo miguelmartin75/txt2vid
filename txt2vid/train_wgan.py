@@ -33,7 +33,6 @@ def gen_perm(n):
 
 
 def load_data(video_dir=None, vocab=None, anno=None, batch_size=64, val=False, num_workers=4, num_channels=3, random_frames=0):
-    # TODO
     from data import get_loader
 
     if num_channels == 3:
@@ -175,10 +174,7 @@ def main(args):
 
         return loss, recon_loss
 
-    def discrim_forward(discrim=None, real_x=None, fake_x=None, correct_captions=None, incorrect_captions=None):
-        pass
-
-    def discrim_step(nsteps=1, videos=None, frames=None, cap_fv=None, real_labels=None, fake_labels=None, real_labels_frames=None, fake_labels_frames=None, last=True, fake=None, fake_frames=None, device=None):
+    def discrim_step(videos=None, frames=None, cap_fv=None, real_labels=None, fake_labels=None, real_labels_frames=None, fake_labels_frames=None, last=True, fake=None, fake_frames=None, device=None):
 
         txt_encoder.zero_grad()
         discrim.zero_grad()
@@ -191,12 +187,74 @@ def main(args):
         fake_frames = frame_map(fake.detach())
         frames = frame_map(videos.detach())
 
-        loss_d0 = discrim_forward(discrim=discrim, real_x=videos.detach(), fake_x=fake.detach(), correct_captions=cap_fv, incorrect_captions=incorrect_captions)
-        loss_d1 = discrim_forward(discrim=frame_discrim, real_x=frames, fake_x=fake_frames, correct_captions=cap_fv, incorrect_captions=incorrect_captions)
-        loss_d2 = discrim_forward(discrim=motion_discrim, real_x=frames, fake_x=fake_frames, correct_captions=cap_fv, incorrect_captions=incorrect_captions)
+        # TODO: check
+        ## D_0 - video sentence pairs
+        # real example, correct caption - predict real
+        loss_d0 = 0
+        real_pred = discrim(vids=videos.detach(), sent=cap_fv, device=device)
+        loss_discrim_real_cc = criteria(real_pred, real_labels)
+        loss_d0 += loss_discrim_real_cc
 
-        loss = torch.mean([loss_d0, loss_d1, loss_d2]) / nsteps
+        # real example, correct caption
+        # predict fake
+        fake_pred = discrim(vids=videos.detach(), sent=incorrect_caps, device=device)
+        loss_discrim_real_ic = criteria(fake_pred, fake_labels)
+        loss_d0 += loss_discrim_real_ic
+
+        # fake example, correct caption
+        fake_pred = discrim(vids=fake.detach(), sent=cap_fv, device=device)
+        loss_discrim_fake = criteria(fake_pred, fake_labels)
+        loss_d0 += loss_discrim_fake
+        
+        ## D_1 - frame sentence pairs
+
+        loss_d1 = 0
+        # real, correct sentence
+        real_pred = frame_discrim(frames, sent=cap_fv, device=device)
+        loss_frames_real_cc = criteria(real_pred, real_labels_frames)
+        loss_d1 += loss_frames_real_cc
+
+        # real, wrong sentence
+        fake_pred = frame_discrim(frames, sent=incorrect_caps, device=device)
+        loss_frames_real_ic = criteria(fake_pred, fake_labels_frames)
+        loss_d1 += loss_frames_real_ic
+
+        # fake, correct sentence
+        fake_pred = frame_discrim(fake_frames, sent=cap_fv, device=device)
+        loss_frames_fake = criteria(fake_pred, fake_labels_frames)
+        loss_d1 += loss_frames_fake
+
+        ## D_2 - motion sentence pairs
+        loss_d2 = 0
+        real_labels_motion = real_labels_frames[0:-1, :] # (time, batch)
+        fake_labels_motion = fake_labels_frames[0:-1, :]
+
+        # real, correct sentence
+        real_pred = motion_discrim(frames, sent=cap_fv, device=device)
+        loss_motion_real_cc = criteria(real_pred, real_labels_motion)
+        loss_d2 += loss_motion_real_cc
+
+        # real, incorrect sentence
+        real_pred = motion_discrim(frames, sent=incorrect_caps, device=device)
+        loss_motion_real_ic = criteria(real_pred, fake_labels_motion)
+        loss_d2 += loss_motion_real_ic
+
+        # fake, correct sentence
+        fake_pred = motion_discrim(fake_frames, sent=cap_fv, device=device)
+        loss_motion_fake = criteria(fake_pred, fake_labels_motion)
+        loss_d2 += loss_motion_fake
+
+        # compute loss
+        loss_d0 /= 3.0
+        loss_d1 /= 3.0 # BCELoss already takes mean
+        loss_d2 /= 3.0 # BCELoss already takes mean
+
+        loss = loss_d0 + loss_d1 + loss_d2
+        loss /= 3.0
+
         loss.backward(retain_graph=not last)
+        optimizerD.step()
+
         return loss
 
     
@@ -241,7 +299,6 @@ def main(args):
             fake = gen(fake_inp)
 
             # discrim step
-            total_discrim_loss = 0
             for j in range(DISCRIM_STEPS):
                 ld = discrim_step(videos=videos,
                                   #frames=real_frames,
@@ -254,9 +311,7 @@ def main(args):
                                   #fake_frames=fake_frames,
                                   last=(j == DISCRIM_STEPS - 1),
                                   device=device)
-                total_discrim_loss = ld
-
-            discrim_loss.update(float(total_discrim_loss))
+                discrim_loss.update(float(ld))
 
             #_, _, cap_fv = txt_encoder(captions, lengths)
             #fake_inp = torch.cat((cap_fv, latent), dim=1)

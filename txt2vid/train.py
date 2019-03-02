@@ -153,7 +153,7 @@ def main(args):
         fake_cc = discrim(fake_x, correct_captions)
 
         real_pred = real_cc
-        fake_pred = torch.cat((real_ic, fake_cc), dim=1)
+        fake_pred = torch.cat((real_ic, fake_cc), dim=0)
         loss = -(torch.mean(real_pred) - torch.mean(fake_pred))
         return loss
 
@@ -168,9 +168,9 @@ def main(args):
 
         real_labels_motion = real_labels_frames[0:-1, :] # (time, batch)
 
-        real_vids = discrim(vids=fake, sent=cap_fv, device=device)
-        real_frames = frame_discrim(fake_frames, sent=cap_fv, device=device)
-        real_motion = motion_discrim(fake_frames, sent=cap_fv, device=device)
+        real_vids = discrim(vids=fake, sent=cap_fv, device=device).unsqueeze(1)
+        real_frames = frame_discrim(fake_frames, sent=cap_fv, device=device).permute(1, 0)
+        real_motion = motion_discrim(fake_frames, sent=cap_fv, device=device).permute(1, 0)
 
         real = torch.cat((real_vids, real_frames, real_motion), dim=1)
         loss = -torch.mean(real) / nsteps
@@ -208,7 +208,9 @@ def main(args):
         loss_d1 = discrim_forward(discrim=frame_discrim, real_x=frames, fake_x=fake_frames, correct_captions=cap_fv, incorrect_captions=incorrect_captions)
         loss_d2 = discrim_forward(discrim=motion_discrim, real_x=frames, fake_x=fake_frames, correct_captions=cap_fv, incorrect_captions=incorrect_captions)
 
-        loss = torch.mean([loss_d0, loss_d1, loss_d2]) / nsteps
+        loss = loss_d2
+        #loss = torch.tensor([loss_d0, loss_d1, loss_d2])
+        #loss = torch.mean(loss) / nsteps
         loss.backward(retain_graph=not last)
         return loss
 
@@ -283,7 +285,7 @@ def main(args):
                 if j != 0:
                     fake = gen(fake_inp)
 
-                lg, lgr = gen_step(nstep=nsteps, 
+                lg, lgr = gen_step(nsteps=GEN_STEPS, 
                                    fake=fake, 
                                    fake_frames=fake_frames,
                                    cap_fv=cap_fv,

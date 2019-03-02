@@ -113,6 +113,8 @@ class Discrim(nn.Module):
             nn.BatchNorm3d(512),
             nn.LeakyReLU(0.2, True),
             nn.Conv3d(512, 1, (1, 2, 2), (1, 2, 2), 0, bias=False),
+            #nn.LeakyReLU(0.2, True),
+            #nn.Linear(3*3, 1)
             #nn.Sigmoid()
         )
 
@@ -129,7 +131,6 @@ class Discrim(nn.Module):
                     sent_temp[:, :, i, j, k] = sent
 
         sent = sent_temp
-        print('vids=', vids.shape())
         vids_plus_sent = torch.cat((vids, sent), dim=1)
 
         pred = self.predictor(vids_plus_sent)
@@ -152,6 +153,8 @@ class MotionDiscrim(nn.Module):
             nn.LeakyReLU(0.2, True),
 
             nn.Conv2d(512, 1, 2, 2, 0, bias=False),
+            #nn.LeakyReLU(0.2, True),
+            #nn.Linear(3*3, 1)
             #nn.Sigmoid()
         )
 
@@ -241,6 +244,8 @@ class FrameDiscrim(nn.Module):
             nn.LeakyReLU(0.2, True),
 
             nn.Conv2d(512, 1, 2, 2, 0, bias=False),
+            #nn.LeakyReLU(0.2, True),
+            #nn.Linear(3*3, 1)
             #nn.Sigmoid()
         )
 

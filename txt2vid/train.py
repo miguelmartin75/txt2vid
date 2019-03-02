@@ -96,17 +96,29 @@ def main(args):
     frame_discrim = model.FrameDiscrim(txt_encode_size=txt_encoder.encoding_size).to(device)
 
 
-    optimizerD = optim.Adam([ 
-        { "params": discrim.parameters() }, 
+    #optimizerD = optim.Adam([ 
+    #    { "params": discrim.parameters() }, 
+    #    #{ "params": txt_encoder.parameters() },
+    #    { "params": frame_map.parameters() },
+    #    { "params": frame_discrim.parameters() },
+    #    { "params": motion_discrim.parameters() },
+    #], lr=args.lr, betas=(args.beta1, args.beta2), weight_decay=0.0005)
+    #optimizerG = optim.Adam([ 
+    #    { "params": gen.parameters() }, 
+    #    #{ "params": txt_encoder.parameters() } 
+    #], lr=args.lr, betas=(args.beta1, args.beta2))
+
+    optimizerD = optim.RMSprop([ 
         #{ "params": txt_encoder.parameters() },
+        { "params": discrim.parameters() }, 
         { "params": frame_map.parameters() },
         { "params": frame_discrim.parameters() },
         { "params": motion_discrim.parameters() },
-    ], lr=args.lr, betas=(args.beta1, args.beta2), weight_decay=0.0005)
-    optimizerG = optim.Adam([ 
-        { "params": gen.parameters() }, 
+    ], lr=args.lr, alpha=args.beta1)
+    optimizerG = optim.RMSprop([ 
         #{ "params": txt_encoder.parameters() } 
-    ], lr=args.lr, betas=(args.beta1, args.beta2))
+        { "params": gen.parameters() }, 
+    ], lr=args.lr, alpha=args.beta1)
 
     if args.model is not None:
         to_load = torch.load(args.model)
@@ -268,9 +280,14 @@ def main(args):
                                   fake=fake.detach(),
                                   last=(j == DISCRIM_STEPS - 1),
                                   device=device)
-                total_discrim_loss = ld
+                optimizerD.step()
 
-            optimizerD.step()
+                for d in [ discrim, frame_discrim, motion_discrim ]:
+                    for p in d.parameters():
+                        p.data.clamp_(-0.01, 0.01)
+
+                total_discrim_loss += ld
+
             discrim_loss.update(float(total_discrim_loss))
 
             #_, _, cap_fv = txt_encoder(captions, lengths)
@@ -293,13 +310,14 @@ def main(args):
                                    real_labels_frames=real_labels_frames,
                                    real_videos=videos,
                                    last=(j == GEN_STEPS - 1))
+                optimizerG.step()
+
                 total_g_loss += lg
                 total_g_loss_recon += lgr
                 
             gen_loss.update(float(total_g_loss))
             gen_recon_loss.update(float(total_g_loss_recon))
 
-            optimizerG.step()
             iteration = epoch*len(dataset) + i
 
             if iteration != 0 and iteration % 100 == 0:

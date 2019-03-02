@@ -156,13 +156,13 @@ def main(args):
     print("Vocab Size %d" % len(vocab))
     print("Dataset len= %d (%d batches)" % (len(dataset)*args.batch_size, len(dataset)))
 
-    def discrim_forward(discrim=None, real_x=None, fake_x=None, correct_captions=None, incorrect_captions=None):
+    def discrim_forward(discrim=None, real_x=None, fake_x=None, correct_captions=None, incorrect_captions=None, device=device):
         # real, correct captions => should predict "REAL"
-        real_cc = discrim(real_x, correct_captions)
+        real_cc = discrim(real_x, correct_captions, device=device)
         # real, incorrect captions => should predict "FAKE"
-        real_ic = discrim(real_x, incorrect_captions)
+        real_ic = discrim(real_x, incorrect_captions, device=device)
         # fake, correct captions => should predict "FAKE"
-        fake_cc = discrim(fake_x, correct_captions)
+        fake_cc = discrim(fake_x, correct_captions, device=device)
 
         real_pred = real_cc
         fake_pred = torch.cat((real_ic, fake_cc), dim=0)
@@ -216,9 +216,9 @@ def main(args):
         fake_frames = frame_map(fake.detach())
         frames = frame_map(videos.detach())
 
-        loss_d0 = discrim_forward(discrim=discrim, real_x=videos.detach(), fake_x=fake.detach(), correct_captions=cap_fv, incorrect_captions=incorrect_captions)
-        loss_d1 = discrim_forward(discrim=frame_discrim, real_x=frames, fake_x=fake_frames, correct_captions=cap_fv, incorrect_captions=incorrect_captions)
-        loss_d2 = discrim_forward(discrim=motion_discrim, real_x=frames, fake_x=fake_frames, correct_captions=cap_fv, incorrect_captions=incorrect_captions)
+        loss_d0 = discrim_forward(discrim=discrim, real_x=videos.detach(), fake_x=fake.detach(), correct_captions=cap_fv, incorrect_captions=incorrect_captions, device=device)
+        loss_d1 = discrim_forward(discrim=frame_discrim, real_x=frames, fake_x=fake_frames, correct_captions=cap_fv, incorrect_captions=incorrect_captions, device=device)
+        loss_d2 = discrim_forward(discrim=motion_discrim, real_x=frames, fake_x=fake_frames, correct_captions=cap_fv, incorrect_captions=incorrect_captions, device=device)
 
         loss = loss_d2
         #loss = torch.tensor([loss_d0, loss_d1, loss_d2])

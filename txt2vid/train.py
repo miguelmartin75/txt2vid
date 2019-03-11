@@ -13,6 +13,8 @@ import torch.utils.data
 import torchvision.utils as vutils
 from torchvision import transforms
 
+from tensorboardX import SummaryWriter
+
 import txt2vid.model as model
 from txt2vid.data import Vocab
 #import txt2vid.videogan as model
@@ -22,6 +24,7 @@ from util.log import status, warn, error
 from util.pickle import load
 
 #FRAME_SIZE=64
+C=0.01
 FRAME_SIZE=48
 
 def gen_perm(n):
@@ -108,6 +111,11 @@ def main(args):
     #    #{ "params": txt_encoder.parameters() } 
     #], lr=args.lr, betas=(args.beta1, args.beta2))
 
+    DISCRIM_STEPS = args.discrim_steps
+    GEN_STEPS = args.gen_steps
+
+    print("DISCRIM STEPS=", DISCRIM_STEPS)
+
     optimizerD = optim.RMSprop([ 
         #{ "params": txt_encoder.parameters() },
         { "params": discrim.parameters() }, 
@@ -181,11 +189,13 @@ def main(args):
         real_labels_motion = real_labels_frames[0:-1, :] # (time, batch)
 
         real_vids = discrim(vids=fake, sent=cap_fv, device=device).unsqueeze(1)
-        real_frames = frame_discrim(fake_frames, sent=cap_fv, device=device).permute(1, 0)
-        real_motion = motion_discrim(fake_frames, sent=cap_fv, device=device).permute(1, 0)
+        #real_frames = frame_discrim(fake_frames, sent=cap_fv, device=device).permute(1, 0)
+        #real_motion = motion_discrim(fake_frames, sent=cap_fv, device=device).permute(1, 0)
 
-        real = torch.cat((real_vids, real_frames, real_motion), dim=1)
-        loss = -torch.mean(real) / nsteps
+        loss = -torch.mean(real_vids) / nsteps
+
+        #real = torch.cat((real_vids, real_frames, real_motion), dim=1)
+        #loss = -torch.mean(real) / nsteps
 
         # don't think this is necessary
         recon_loss = 0.0
@@ -201,7 +211,6 @@ def main(args):
         return loss, recon_loss
 
     def discrim_step(nsteps=1, videos=None, cap_fv=None, real_labels=None, fake_labels=None, real_labels_frames=None, fake_labels_frames=None, last=True, fake=None, device=None):
-
         txt_encoder.zero_grad()
         discrim.zero_grad()
         frame_map.zero_grad()
@@ -217,19 +226,16 @@ def main(args):
         frames = frame_map(videos.detach())
 
         loss_d0 = discrim_forward(discrim=discrim, real_x=videos.detach(), fake_x=fake.detach(), correct_captions=cap_fv, incorrect_captions=incorrect_captions, device=device)
-        loss_d1 = discrim_forward(discrim=frame_discrim, real_x=frames, fake_x=fake_frames, correct_captions=cap_fv, incorrect_captions=incorrect_captions, device=device)
-        loss_d2 = discrim_forward(discrim=motion_discrim, real_x=frames, fake_x=fake_frames, correct_captions=cap_fv, incorrect_captions=incorrect_captions, device=device)
+        #loss_d1 = discrim_forward(discrim=frame_discrim, real_x=frames, fake_x=fake_frames, correct_captions=cap_fv, incorrect_captions=incorrect_captions, device=device)
+        #loss_d2 = discrim_forward(discrim=motion_discrim, real_x=frames, fake_x=fake_frames, correct_captions=cap_fv, incorrect_captions=incorrect_captions, device=device)
 
-        loss = loss_d2
-        #loss = torch.tensor([loss_d0, loss_d1, loss_d2])
+        loss = loss_d0 / nsteps
+        #loss = torch.tensor([loss_d0, loss_d1, loss_d2], device=device, requires_grad=True)
         #loss = torch.mean(loss) / nsteps
         loss.backward(retain_graph=not last)
         return loss
 
     
-    DISCRIM_STEPS = args.discrim_steps
-    GEN_STEPS = args.gen_steps
-
     from txt2vid.metrics import RollingAvgLoss
 
     LOSS_WINDOW_SIZE=50
@@ -240,12 +246,16 @@ def main(args):
     REAL_LABELS_FRAMES = torch.full((16, args.batch_size), REAL_LABEL, device=device)
     FAKE_LABELS_FRAMES = torch.full((16, args.batch_size), FAKE_LABEL, device=device)
 
+    writer = SummaryWriter()
+
     # TODO: when to backprop for txt_encoder
     for epoch in range(args.epoch):
         print('epoch=', epoch + 1)
         sys.stdout.flush()
 
         for i, (videos, captions, lengths) in enumerate(dataset):
+            iteration = epoch*len(dataset) + i
+
             # TODO: hyper-params for GAN training
             videos = videos.to(device).permute(0, 2, 1, 3, 4)
             captions = captions.to(device)
@@ -282,9 +292,29 @@ def main(args):
                                   device=device)
                 optimizerD.step()
 
-                for d in [ discrim, frame_discrim, motion_discrim ]:
-                    for p in d.parameters():
-                        p.data.clamp_(-0.01, 0.01)
+                names = [ 'video_discrim', 'frame_discrim', 'motion_discrim' ]
+                all_discrims  = [ discrim, frame_discrim, motion_discrim ]
+                for name, d in zip(names, all_discrims):
+                    def map_params(layer):
+                        layer_name = layer.__class__.__name__
+
+                        if 'Conv' in layer_name or 'Linear' in layer_name or 'BatchNorm' in layer_name:
+                            if hasattr(layer, 'weight') and layer.weight is not None:
+                                writer.add_histogram('%s/%s/weight' % (name, layer_name), layer.weight.data.clone().cpu().numpy(), iteration)
+                                #if 'BatchNorm' not in layer_name:
+                                    #layer.weight.data.clamp_(-C, C)
+                            if hasattr(layer, 'bias') and layer.bias is not None:
+                                writer.add_histogram('%s/%s/bias' % (name, layer_name), layer.bias.data.clone().cpu().numpy(), iteration)
+                                if 'BatchNorm' not in layer_name:
+                                    layer.bias.data.clamp_(-C, C)
+
+
+                    d.apply(map_params)
+
+                    #for name, p in d.named_parameters():
+                        #p.data.clamp_(-C, C)
+
+                
 
                 total_discrim_loss += ld
 
@@ -318,8 +348,6 @@ def main(args):
             gen_loss.update(float(total_g_loss))
             gen_recon_loss.update(float(total_g_loss_recon))
 
-            iteration = epoch*len(dataset) + i
-
             if iteration != 0 and iteration % 100 == 0:
                 
                 to_save = {
@@ -344,7 +372,7 @@ def main(args):
                 print('[%d/%d][%d/%d] Loss_D: %.4f Loss_G: %.4f (recon = %.4f)' % 
                         (epoch, args.epoch, i, len(dataset), discrim_loss.get(), gen_loss.get(), gen_recon_loss.get()))
 
-            if iteration % 50 == 0:
+            if iteration % 10 == 0:
                 # TODO: output sentences
                 to_save_real = videos
                 to_save_fake = fake
@@ -389,7 +417,7 @@ if __name__ == '__main__':
     parser.add_argument('--beta2', type=float, default=0.999, help='beta1 for adam. default=0.5')
     
     parser.add_argument('--gen_steps', type=int, default=1, help='Number of generator steps to use per iteration')
-    parser.add_argument('--discrim_steps', type=int, default=1, help='Number of discriminator steps to use per iteration')
+    parser.add_argument('--discrim_steps', type=int, default=5, help='Number of discriminator steps to use per iteration')
 
     parser.add_argument('--sent_encode_path', type=str, default=None, help='Initial model for the sentence encoder')
 

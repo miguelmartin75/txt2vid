@@ -354,7 +354,7 @@ def weights_init(layer):
         #global USE_NORMAL_INIT
         if USE_NORMAL_INIT:
             print("normal init")
-            layer.weight.data.normal_(0.0, 0.02)
+            layer.weight.data.normal_(0.0, 0.005)
         else:
             print("xavier init")
             init.xavier_normal_(layer.weight.data)

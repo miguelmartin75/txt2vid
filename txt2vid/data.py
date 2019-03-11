@@ -70,6 +70,9 @@ class SynthDataset(data.Dataset):
                 self.video_ids.append(vid)
                 self.captions.append(cap)
 
+        #self.video_ids = self.video_ids[0:2]
+        #self.captions = self.captions[0:2]
+
         print("Missing: %d videos" % self.missing)
 
     def __getitem__(self, idx):

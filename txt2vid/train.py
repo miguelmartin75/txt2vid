@@ -302,8 +302,8 @@ def main(args):
                         if 'Conv' in layer_name or 'Linear' in layer_name or 'BatchNorm' in layer_name:
                             if hasattr(layer, 'weight') and layer.weight is not None:
                                 #writer.add_histogram('%s/%s/weight' % (name, layer_name), layer.weight.data.clone().cpu().numpy(), iteration)
-                                #if 'BatchNorm' not in layer_name:
-                                    #layer.weight.data.clamp_(-C, C)
+                                if 'BatchNorm' not in layer_name:
+                                    layer.weight.data.clamp_(-C, C)
                             if hasattr(layer, 'bias') and layer.bias is not None:
                                 #writer.add_histogram('%s/%s/bias' % (name, layer_name), layer.bias.data.clone().cpu().numpy(), iteration)
                                 if 'BatchNorm' not in layer_name:

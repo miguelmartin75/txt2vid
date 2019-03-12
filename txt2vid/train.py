@@ -195,7 +195,7 @@ def main(args):
         #loss = -torch.mean(real_vids) / nsteps
 
         #real = torch.cat((real_vids, real_frames, real_motion), dim=1)
-	real = (real_vids.mean() + real_frames.mean() + real_motion.mean()) / 3
+        real = (real_vids.mean() + real_frames.mean() + real_motion.mean()) / 3
         loss = -real / nsteps
 
         # don't think this is necessary

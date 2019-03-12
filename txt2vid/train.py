@@ -13,7 +13,7 @@ import torch.utils.data
 import torchvision.utils as vutils
 from torchvision import transforms
 
-from tensorboardX import SummaryWriter
+#from tensorboardX import SummaryWriter
 
 import txt2vid.model as model
 from txt2vid.data import Vocab
@@ -247,7 +247,7 @@ def main(args):
     REAL_LABELS_FRAMES = torch.full((16, args.batch_size), REAL_LABEL, device=device)
     FAKE_LABELS_FRAMES = torch.full((16, args.batch_size), FAKE_LABEL, device=device)
 
-    writer = SummaryWriter()
+    #writer = SummaryWriter()
 
     # TODO: when to backprop for txt_encoder
     for epoch in range(args.epoch):
@@ -301,11 +301,11 @@ def main(args):
 
                         if 'Conv' in layer_name or 'Linear' in layer_name or 'BatchNorm' in layer_name:
                             if hasattr(layer, 'weight') and layer.weight is not None:
-                                writer.add_histogram('%s/%s/weight' % (name, layer_name), layer.weight.data.clone().cpu().numpy(), iteration)
+                                #writer.add_histogram('%s/%s/weight' % (name, layer_name), layer.weight.data.clone().cpu().numpy(), iteration)
                                 #if 'BatchNorm' not in layer_name:
                                     #layer.weight.data.clamp_(-C, C)
                             if hasattr(layer, 'bias') and layer.bias is not None:
-                                writer.add_histogram('%s/%s/bias' % (name, layer_name), layer.bias.data.clone().cpu().numpy(), iteration)
+                                #writer.add_histogram('%s/%s/bias' % (name, layer_name), layer.bias.data.clone().cpu().numpy(), iteration)
                                 if 'BatchNorm' not in layer_name:
                                     layer.bias.data.clamp_(-C, C)
 

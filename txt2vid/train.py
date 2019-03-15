@@ -208,8 +208,6 @@ def main(args):
 
         loss.backward(retain_graph=not last)
 
-        optimizerG.step()
-
         return loss, recon_loss
 
     def discrim_step(nsteps=1, videos=None, cap_fv=None, real_labels=None, fake_labels=None, real_labels_frames=None, fake_labels_frames=None, last=True, fake=None, device=None):

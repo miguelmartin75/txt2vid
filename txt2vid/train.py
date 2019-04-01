@@ -384,7 +384,7 @@ def main(args):
                 print('[%d/%d][%d/%d] Loss_D: %.4f Loss_G: %.4f (recon = %.4f)' % 
                         (epoch, args.epoch, i, len(dataset), discrim_loss.get(), gen_loss.get(), gen_recon_loss.get()))
 
-            if iteration % 10 == 0:
+            if iteration % 100 == 0:
                 # TODO: output sentences
                 to_save_real = videos
                 to_save_fake = fake

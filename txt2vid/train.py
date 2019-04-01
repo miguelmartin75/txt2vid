@@ -24,7 +24,6 @@ from util.log import status, warn, error
 from util.pickle import load
 
 #FRAME_SIZE=64
-C=1000.01
 FRAME_SIZE=48
 
 def gen_perm(n):
@@ -98,6 +97,7 @@ def main(args):
     motion_discrim = model.MotionDiscrim(txt_encode_size=txt_encoder.encoding_size).to(device)
     frame_discrim = model.FrameDiscrim(txt_encode_size=txt_encoder.encoding_size).to(device)
 
+    C = args.weight_clip
 
     #optimizerD = optim.Adam([ 
     #    { "params": discrim.parameters() }, 
@@ -438,6 +438,8 @@ if __name__ == '__main__':
 
     parser.add_argument('--num_channels', type=int, default=1, help='number of channels in input')
     parser.add_argument('--random_frames', type=int, default=0, help='use random frames')
+
+    parser.add_argument('--weight_clip', type=float, default=0.01, help='weight clip value')
 
     args = parser.parse_args()
     main(args)

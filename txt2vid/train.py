@@ -24,7 +24,7 @@ from util.log import status, warn, error
 from util.pickle import load
 
 #FRAME_SIZE=64
-C=1000.01
+C=10000.01
 FRAME_SIZE=48
 
 def gen_perm(n):
@@ -188,15 +188,11 @@ def main(args):
 
         real_labels_motion = real_labels_frames[0:-1, :] # (time, batch)
 
-        real_vids = discrim(vids=fake, sent=cap_fv, device=device).unsqueeze(1)
-        #real_frames = frame_discrim(fake_frames, sent=cap_fv, device=device).permute(1, 0)
-        #real_motion = motion_discrim(fake_frames, sent=cap_fv, device=device).permute(1, 0)
+        real_vids = discrim(vids=fake, sent=cap_fv, device=device)
+        real_frames = frame_discrim(fake_frames, sent=cap_fv, device=device)
+        real_motion = motion_discrim(fake_frames, sent=cap_fv, device=device)
 
-        #loss = -torch.mean(real_vids) / nsteps
-
-        #real = torch.cat((real_vids, real_frames, real_motion), dim=1)
-        #real = (real_vids.mean() + real_frames.mean() + real_motion.mean()) / 3
-        real = real_vids.mean()
+        real = (real_vids.mean() + real_frames.mean() + real_motion.mean()) / 3
         loss = -real / nsteps
 
         # don't think this is necessary
@@ -226,12 +222,11 @@ def main(args):
         frames = frame_map(videos.detach())
 
         loss_d0 = discrim_forward(discrim=discrim, real_x=videos.detach(), fake_x=fake.detach(), correct_captions=cap_fv, incorrect_captions=incorrect_captions, device=device)
-        #loss_d1 = discrim_forward(discrim=frame_discrim, real_x=frames, fake_x=fake_frames, correct_captions=cap_fv, incorrect_captions=incorrect_captions, device=device)
-        #loss_d2 = discrim_forward(discrim=motion_discrim, real_x=frames, fake_x=fake_frames, correct_captions=cap_fv, incorrect_captions=incorrect_captions, device=device)
+        loss_d1 = discrim_forward(discrim=frame_discrim, real_x=frames, fake_x=fake_frames, correct_captions=cap_fv, incorrect_captions=incorrect_captions, device=device)
+        loss_d2 = discrim_forward(discrim=motion_discrim, real_x=frames, fake_x=fake_frames, correct_captions=cap_fv, incorrect_captions=incorrect_captions, device=device)
 
-        loss = loss_d0 / nsteps
-        #loss = torch.tensor([loss_d0, loss_d1, loss_d2], device=device, requires_grad=True)
-        #loss = torch.mean(loss) / nsteps
+        loss = torch.tensor([loss_d0, loss_d1, loss_d2], device=device, requires_grad=True)
+        loss = torch.mean(loss) / nsteps
         loss.backward(retain_graph=not last)
         return loss
 

@@ -134,7 +134,8 @@ def main(args):
     REAL_LABELS = torch.full((args.batch_size,), REAL_LABEL, device=device, dtype=torch.float, requires_grad=False)
     FAKE_LABELS = torch.full((args.batch_size,), FAKE_LABEL, device=device, dtype=torch.float, requires_grad=False)
 
-    criteria = nn.BCELoss()
+    #criteria = nn.BCELoss()
+    criteria = nn.BCEWithLogitsLoss()
     recon = nn.L1Loss()
     if args.recon_l2:
         recon = nn.MSELoss()
@@ -405,7 +406,7 @@ if __name__ == '__main__':
     parser.add_argument('--beta2', type=float, default=0.999, help='beta1 for adam. default=0.5')
     
     parser.add_argument('--gen_steps', type=int, default=1, help='Number of generator steps to use per iteration')
-    parser.add_argument('--discrim_steps', type=int, default=5, help='Number of discriminator steps to use per iteration')
+    parser.add_argument('--discrim_steps', type=int, default=1, help='Number of discriminator steps to use per iteration')
 
     parser.add_argument('--sent_encode_path', type=str, default=None, help='Initial model for the sentence encoder')
 

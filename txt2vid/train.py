@@ -24,7 +24,6 @@ from util.log import status, warn, error
 from util.pickle import load
 
 #FRAME_SIZE=64
-C=10000.01
 FRAME_SIZE=48
 
 def gen_perm(n):
@@ -98,35 +97,36 @@ def main(args):
     motion_discrim = model.MotionDiscrim(txt_encode_size=txt_encoder.encoding_size).to(device)
     frame_discrim = model.FrameDiscrim(txt_encode_size=txt_encoder.encoding_size).to(device)
 
+    C = args.weight_clip
 
-    #optimizerD = optim.Adam([ 
-    #    { "params": discrim.parameters() }, 
-    #    #{ "params": txt_encoder.parameters() },
-    #    { "params": frame_map.parameters() },
-    #    { "params": frame_discrim.parameters() },
-    #    { "params": motion_discrim.parameters() },
-    #], lr=args.lr, betas=(args.beta1, args.beta2), weight_decay=0.0005)
-    #optimizerG = optim.Adam([ 
-    #    { "params": gen.parameters() }, 
-    #    #{ "params": txt_encoder.parameters() } 
-    #], lr=args.lr, betas=(args.beta1, args.beta2))
+    optimizerD = optim.Adam([ 
+        { "params": discrim.parameters() }, 
+        #{ "params": txt_encoder.parameters() },
+        { "params": frame_map.parameters() },
+        { "params": frame_discrim.parameters() },
+        { "params": motion_discrim.parameters() },
+    ], lr=args.lr, betas=(args.beta1, args.beta2))
+    optimizerG = optim.Adam([ 
+        { "params": gen.parameters() }, 
+        #{ "params": txt_encoder.parameters() } 
+    ], lr=args.lr, betas=(args.beta1, args.beta2))
 
     DISCRIM_STEPS = args.discrim_steps
     GEN_STEPS = args.gen_steps
 
     print("DISCRIM STEPS=", DISCRIM_STEPS)
 
-    optimizerD = optim.RMSprop([ 
-        #{ "params": txt_encoder.parameters() },
-        { "params": discrim.parameters() }, 
-        { "params": frame_map.parameters() },
-        { "params": frame_discrim.parameters() },
-        { "params": motion_discrim.parameters() },
-    ], lr=args.lr, alpha=args.beta1)
-    optimizerG = optim.RMSprop([ 
-        #{ "params": txt_encoder.parameters() } 
-        { "params": gen.parameters() }, 
-    ], lr=args.lr, alpha=args.beta1)
+    #optimizerD = optim.RMSprop([ 
+    #    #{ "params": txt_encoder.parameters() },
+    #    { "params": discrim.parameters() }, 
+    #    { "params": frame_map.parameters() },
+    #    { "params": frame_discrim.parameters() },
+    #    { "params": motion_discrim.parameters() },
+    #], lr=args.lr, alpha=args.beta1)
+    #optimizerG = optim.RMSprop([ 
+    #    #{ "params": txt_encoder.parameters() } 
+    #    { "params": gen.parameters() }, 
+    #], lr=args.lr, alpha=args.beta1)
 
     if args.model is not None:
         to_load = torch.load(args.model)
@@ -156,7 +156,7 @@ def main(args):
     REAL_LABELS = torch.full((args.batch_size,), REAL_LABEL, device=device, dtype=torch.float, requires_grad=False)
     FAKE_LABELS = torch.full((args.batch_size,), FAKE_LABEL, device=device, dtype=torch.float, requires_grad=False)
 
-    criteria = nn.BCELoss()
+    criteria = nn.BCEWithLogitsLoss()
     recon = nn.L1Loss()
     if args.recon_l2:
         recon = nn.MSELoss()
@@ -164,7 +164,10 @@ def main(args):
     print("Vocab Size %d" % len(vocab))
     print("Dataset len= %d (%d batches)" % (len(dataset)*args.batch_size, len(dataset)))
 
-    def discrim_forward(discrim=None, real_x=None, fake_x=None, correct_captions=None, incorrect_captions=None, device=device):
+    REAL_LABELS_FRAMES = torch.full((16, args.batch_size), REAL_LABEL, device=device)
+    FAKE_LABELS_FRAMES = torch.full((16, args.batch_size), FAKE_LABEL, device=device)
+
+    def discrim_forward(discrim=None, real_x=None, fake_x=None, correct_captions=None, incorrect_captions=None, device=device, real_labels=None, fake_labels=None):
         # real, correct captions => should predict "REAL"
         real_cc = discrim(real_x, correct_captions, device=device)
         # real, incorrect captions => should predict "FAKE"
@@ -174,7 +177,14 @@ def main(args):
 
         real_pred = real_cc
         fake_pred = torch.cat((real_ic, fake_cc), dim=0)
-        loss = -(torch.mean(real_pred) - torch.mean(fake_pred))
+
+        loss = 0.0
+        loss += criteria(real_cc, real_labels)
+        loss += criteria(real_ic, fake_labels) 
+        loss += criteria(fake_cc, fake_labels)
+        loss /= 3.0
+
+        #loss = -(torch.mean(real_pred) - torch.mean(fake_pred))
         return loss
 
     def gen_step(nsteps=1, fake=None, fake_frames=None, cap_fv=None, real_labels=None, real_labels_frames=None, last=True, real_videos=None):
@@ -203,7 +213,6 @@ def main(args):
             loss += recon_loss
 
         loss.backward(retain_graph=not last)
-
         return loss, recon_loss
 
     def discrim_step(nsteps=1, videos=None, cap_fv=None, real_labels=None, fake_labels=None, real_labels_frames=None, fake_labels_frames=None, last=True, fake=None, device=None):
@@ -237,9 +246,6 @@ def main(args):
     gen_loss = RollingAvgLoss(window_size=LOSS_WINDOW_SIZE)
     gen_recon_loss = RollingAvgLoss(window_size=LOSS_WINDOW_SIZE)
     discrim_loss = RollingAvgLoss(window_size=LOSS_WINDOW_SIZE)
-
-    REAL_LABELS_FRAMES = torch.full((16, args.batch_size), REAL_LABEL, device=device)
-    FAKE_LABELS_FRAMES = torch.full((16, args.batch_size), FAKE_LABEL, device=device)
 
     #writer = SummaryWriter()
 
@@ -310,8 +316,7 @@ def main(args):
                         #p.data.clamp_(-C, C)
 
                 
-
-                total_discrim_loss += ld
+                total_discrim_loss += float(ld)
 
             discrim_loss.update(float(total_discrim_loss))
 
@@ -335,10 +340,10 @@ def main(args):
                                    real_labels_frames=real_labels_frames,
                                    real_videos=videos,
                                    last=(j == GEN_STEPS - 1))
-                optimizerG.step()
+                total_g_loss += float(lg)
+                total_g_loss_recon += float(lgr)
 
-                total_g_loss += lg
-                total_g_loss_recon += lgr
+                optimizerG.step()
                 
             gen_loss.update(float(total_g_loss))
             gen_recon_loss.update(float(total_g_loss_recon))
@@ -412,7 +417,7 @@ if __name__ == '__main__':
     parser.add_argument('--beta2', type=float, default=0.999, help='beta1 for adam. default=0.5')
     
     parser.add_argument('--gen_steps', type=int, default=1, help='Number of generator steps to use per iteration')
-    parser.add_argument('--discrim_steps', type=int, default=5, help='Number of discriminator steps to use per iteration')
+    parser.add_argument('--discrim_steps', type=int, default=1, help='Number of discriminator steps to use per iteration')
 
     parser.add_argument('--sent_encode_path', type=str, default=None, help='Initial model for the sentence encoder')
 
@@ -433,6 +438,8 @@ if __name__ == '__main__':
 
     parser.add_argument('--num_channels', type=int, default=1, help='number of channels in input')
     parser.add_argument('--random_frames', type=int, default=0, help='use random frames')
+
+    parser.add_argument('--weight_clip', type=float, default=0.01, help='weight clip value')
 
     args = parser.parse_args()
     main(args)

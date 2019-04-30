@@ -13,18 +13,16 @@ import torch.utils.data
 import torchvision.utils as vutils
 from torchvision import transforms
 
-#from tensorboardX import SummaryWriter
-
 import txt2vid.model as model
 from txt2vid.data import Vocab
-#import txt2vid.videogan as model
 from txt2vid.model import SentenceEncoder
+from txt2vid.models.discrim import Discrim
+from txt2vid.models.gen import VideoGen
 
 from util.log import status, warn, error
 from util.pickle import load
 
-#FRAME_SIZE=64
-FRAME_SIZE=48
+FRAME_SIZE=64
 
 def gen_perm(n):
     old_perm = np.array(range(n))
@@ -89,22 +87,19 @@ def main(args):
                                       num_layers=args.txt_layers, 
                                       vocab_size=len(vocab)).to(device)
 
-    discrim = model.Discrim(txt_encode_size=txt_encoder.encoding_size,
-                            num_channels=args.num_channels).to(device)
-    gen = model.Generator(latent_size=(txt_encoder.encoding_size + args.latent_size), 
+    discrim = Discrim(txt_encode_size=txt_encoder.encoding_size,
+                      num_channels=args.num_channels).to(device)
+    gen = VideoGen(latent_size=(txt_encoder.encoding_size + args.latent_size), 
                           num_channels=args.num_channels).to(device)
-    frame_map = model.FrameMap(num_channels=args.num_channels).to(device)
-    motion_discrim = model.MotionDiscrim(txt_encode_size=txt_encoder.encoding_size).to(device)
-    frame_discrim = model.FrameDiscrim(txt_encode_size=txt_encoder.encoding_size).to(device)
+    #frame_map = model.FrameMap(num_channels=args.num_channels).to(device)
+    #motion_discrim = model.MotionDiscrim(txt_encode_size=txt_encoder.encoding_size).to(device)
+    #frame_discrim = model.FrameDiscrim(txt_encode_size=txt_encoder.encoding_size).to(device)
 
     C = args.weight_clip
 
     optimizerD = optim.Adam([ 
         { "params": discrim.parameters() }, 
         #{ "params": txt_encoder.parameters() },
-        { "params": frame_map.parameters() },
-        { "params": frame_discrim.parameters() },
-        { "params": motion_discrim.parameters() },
     ], lr=args.lr, betas=(args.beta1, args.beta2))
     optimizerG = optim.Adam([ 
         { "params": gen.parameters() }, 
@@ -116,27 +111,12 @@ def main(args):
 
     print("DISCRIM STEPS=", DISCRIM_STEPS)
 
-    #optimizerD = optim.RMSprop([ 
-    #    #{ "params": txt_encoder.parameters() },
-    #    { "params": discrim.parameters() }, 
-    #    { "params": frame_map.parameters() },
-    #    { "params": frame_discrim.parameters() },
-    #    { "params": motion_discrim.parameters() },
-    #], lr=args.lr, alpha=args.beta1)
-    #optimizerG = optim.RMSprop([ 
-    #    #{ "params": txt_encoder.parameters() } 
-    #    { "params": gen.parameters() }, 
-    #], lr=args.lr, alpha=args.beta1)
-
     if args.model is not None:
         to_load = torch.load(args.model)
 
         gen.load_state_dict(to_load['gen'])
 
         discrim.load_state_dict(to_load['discrim'])
-        frame_map.load_state_dict(to_load['frame_map'])
-        frame_discrim.load_state_dict(to_load['frame_discrim'])
-        motion_discrim.load_state_dict(to_load['motion_discrim'])
 
         txt_encoder.load_state_dict(to_load['txt'])
         optimizerD.load_state_dict(to_load['optD'])
@@ -167,7 +147,7 @@ def main(args):
     REAL_LABELS_FRAMES = torch.full((16, args.batch_size), REAL_LABEL, device=device)
     FAKE_LABELS_FRAMES = torch.full((16, args.batch_size), FAKE_LABEL, device=device)
 
-    def discrim_forward(discrim=None, real_x=None, fake_x=None, correct_captions=None, incorrect_captions=None, device=device, real_labels=None, fake_labels=None):
+    def discrim_forward_cap(discrim=None, real_x=None, fake_x=None, correct_captions=None, incorrect_captions=None, device=device, real_labels=None, fake_labels=None):
         # real, correct captions => should predict "REAL"
         real_cc = discrim(real_x, correct_captions, device=device)
         # real, incorrect captions => should predict "FAKE"
@@ -187,7 +167,7 @@ def main(args):
         #loss = -(torch.mean(real_pred) - torch.mean(fake_pred))
         return loss
 
-    def gen_step(nsteps=1, fake=None, fake_frames=None, cap_fv=None, real_labels=None, real_labels_frames=None, last=True, real_videos=None):
+    def gen_step_cap(nsteps=1, fake=None, fake_frames=None, cap_fv=None, real_labels=None, real_labels_frames=None, last=True, real_videos=None):
         gen.zero_grad()
         txt_encoder.zero_grad()
 
@@ -199,8 +179,6 @@ def main(args):
         real_labels_motion = real_labels_frames[0:-1, :] # (time, batch)
 
         real_vids = discrim(vids=fake, sent=cap_fv, device=device)
-        real_frames = frame_discrim(fake_frames, sent=cap_fv, device=device)
-        real_motion = motion_discrim(fake_frames, sent=cap_fv, device=device)
 
         real = (real_vids.mean() + real_frames.mean() + real_motion.mean()) / 3
         loss = -real / nsteps
@@ -215,12 +193,9 @@ def main(args):
         loss.backward(retain_graph=not last)
         return loss, recon_loss
 
-    def discrim_step(nsteps=1, videos=None, cap_fv=None, real_labels=None, fake_labels=None, real_labels_frames=None, fake_labels_frames=None, last=True, fake=None, device=None):
+    def discrim_step_cap(nsteps=1, videos=None, cap_fv=None, real_labels=None, fake_labels=None, real_labels_frames=None, fake_labels_frames=None, last=True, fake=None, device=None):
         txt_encoder.zero_grad()
         discrim.zero_grad()
-        frame_map.zero_grad()
-        motion_discrim.zero_grad()
-        frame_discrim.zero_grad()
 
         incorrect_captions = cap_fv[gen_perm(cap_fv.size(0))]
 
@@ -236,6 +211,59 @@ def main(args):
 
         loss = torch.tensor([loss_d0, loss_d1, loss_d2], device=device, requires_grad=True)
         loss = torch.mean(loss) / nsteps
+        loss.backward(retain_graph=not last)
+        return loss
+
+    # =================
+
+    def discrim_forward(discrim=None, real_x=None, fake_x=None, correct_captions=None, incorrect_captions=None, device=device, real_labels=None, fake_labels=None):
+        # real, correct captions => should predict "REAL"
+        real = discrim(real_x, device=device)
+        # fake, correct captions => should predict "FAKE"
+        fake = discrim(fake_x, device=device)
+
+        return -(torch.mean(real_pred) - torch.mean(fake_pred))
+
+    def gen_step(nsteps=1, fake=None, fake_frames=None, cap_fv=None, real_labels=None, real_labels_frames=None, last=True, real_videos=None):
+        gen.zero_grad()
+        #txt_encoder.zero_grad()
+
+        # ============
+        # forward fake with correct captions
+        # should all aim to fool discrim, i.e. predict "REAL"
+        # ============
+
+        real_labels_motion = real_labels_frames[0:-1, :] # (time, batch)
+
+        real_vids = discrim(vids=fake, sent=cap_fv, device=device)
+
+        real = real_vids
+        loss = -real / nsteps
+
+        # don't think this is necessary
+        recon_loss = 0.0
+        if args.recon_lambda > 0:
+            recon_loss = recon(fake, real_videos) * args.recon_lambda
+            recon_loss /= nsteps
+            loss += recon_loss
+
+        loss.backward(retain_graph=not last)
+        return loss, recon_loss
+
+    def discrim_step(nsteps=1, videos=None, cap_fv=None, real_labels=None, fake_labels=None, real_labels_frames=None, fake_labels_frames=None, last=True, fake=None, device=None):
+        discrim.zero_grad()
+
+        #incorrect_captions = cap_fv[gen_perm(cap_fv.size(0))]
+
+        #real_labels_motion = real_labels_frames[0:-1, :] # (time, batch)
+        #fake_labels_motion = fake_labels_frames[0:-1, :]
+
+        #fake_frames = frame_map(fake.detach())
+        #frames = frame_map(videos.detach())
+
+        loss_d0 = discrim_forward(discrim=discrim, real_x=videos.detach(), fake_x=fake.detach(), correct_captions=cap_fv, incorrect_captions=incorrect_captions, device=device)
+
+        loss = loss_d0
         loss.backward(retain_graph=not last)
         return loss
 
@@ -269,11 +297,12 @@ def main(args):
             real_labels_frames = REAL_LABELS_FRAMES[:, 0:batch_size]
             fake_labels_frames = FAKE_LABELS_FRAMES[:, 0:batch_size]
 
-            _, _, cap_fv = txt_encoder(captions, lengths)
-            cap_fv = cap_fv.detach()
+            #_, _, cap_fv = txt_encoder(captions, lengths)
+            #cap_fv = cap_fv.detach()
 
             latent = torch.randn(batch_size, SAMPLE_LATENT_SIZE, device=device)
-            fake_inp = torch.cat((cap_fv, latent), dim=1)
+            fake_inp = latent
+            #fake_inp = torch.cat((cap_fv, latent), dim=1)
             fake_inp = fake_inp.view(fake_inp.size(0), fake_inp.size(1), 1, 1, 1)
 
             fake = gen(fake_inp)
@@ -412,9 +441,9 @@ if __name__ == '__main__':
     parser.add_argument('--vocab', type=str, help='vocab location', required=True)
     parser.add_argument('--batch_size', type=int, default=64, help='input batch size')
 
-    parser.add_argument('--lr', type=float, default=0.0002, help='learning rate')
-    parser.add_argument('--beta1', type=float, default=0.9, help='beta1 for adam. default=0.5')
-    parser.add_argument('--beta2', type=float, default=0.999, help='beta1 for adam. default=0.5')
+    parser.add_argument('--lr', type=float, default=0.0001, help='learning rate')
+    parser.add_argument('--beta1', type=float, default=0.5, help='beta1 for adam')
+    parser.add_argument('--beta2', type=float, default=0.9, help='beta1 for adam')
     
     parser.add_argument('--gen_steps', type=int, default=1, help='Number of generator steps to use per iteration')
     parser.add_argument('--discrim_steps', type=int, default=1, help='Number of discriminator steps to use per iteration')
@@ -426,7 +455,8 @@ if __name__ == '__main__':
     parser.add_argument('--txt_layers', type=int, default=3, help='Number of layers in the sentence model')
     parser.add_argument('--sent_encode', type=int, default=256, help='Encoding for the sentence')
 
-    parser.add_argument('--latent_size', type=int, default=100, help='Additional number of dimensions for random variable')
+    parser.add_argument('--latent_size', type=int, default=256, help='Additional number of dimensions for random variable')
+    parser.add_argument('--frame_latent_size', type=int, default=256, help='Latent size for each frame')
 
     parser.add_argument('--recon_lambda', type=float, default=0.1, help='Multiplier for reconstruction loss')
     parser.add_argument('--recon_l2', action='store_true', help='Use L2 loss for recon')

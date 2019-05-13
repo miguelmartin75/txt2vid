@@ -16,21 +16,13 @@ from torchvision import transforms
 import txt2vid.model as model
 from txt2vid.data import Vocab
 from txt2vid.model import SentenceEncoder
-from txt2vid.models.discrim import Discrim
-from txt2vid.models.gen import VideoGen
 
 from util.log import status, warn, error
 from util.pickle import load
+from util.misc import gen_perm
 
+# TODO: load from args
 FRAME_SIZE=64
-
-def gen_perm(n):
-    old_perm = np.array(range(n))
-    new_perm = np.random.permutation(old_perm)
-    while (new_perm == old_perm).all():
-        new_perm = np.random.permutation(old_perm)
-    return new_perm
-
 
 def load_data(video_dir=None, vocab=None, anno=None, batch_size=64, val=False, num_workers=4, num_channels=3, random_frames=0):
     # TODO
@@ -48,19 +40,344 @@ def load_data(video_dir=None, vocab=None, anno=None, batch_size=64, val=False, n
 
     return get_loader(video_dir, anno, vocab, transform, batch_size, shuffle=not val, num_workers=num_workers, random_frames=random_frames)
 
-def main(args):
-    if args.seed is None:
-        args.seed = random.randint(1, 100000)
-    status('Seed: %d' % args.seed)
+# parameters for the training algorithm
+class TrainParams(object):
+    # algorithm constants
+    discrim_steps = 1
+    gen_steps = 1
 
-    random.seed(args.seed)
-    torch.manual_seed(args.seed)
+    # if true, will divide each step by discrim/gen_steps respectively
+    mean_discrim_loss = True
+    mean_gen_loss = True
 
+    # ---------
+    # --- misc
+    # ---------
+
+    # whether or not to use SummaryWriter
+    use_writer = False
+    # period of iterations to log, <= 0 to not log
+    log_period = 100
+    # number of iterations to average loss over
+    loss_window_size = 50
+    # period to save generated examples, <= 0 to not
+    save_example_period = 100
+    # period to save trained models, <= 0 to not
+    save_model_period = 100
+
+    out_samples_dir = None
+
+    def __init__(self):
+        pass
+
+    def read_from(self, args):
+        self.__dict__.update(args.__dict__.copy())
+        return self
+
+
+class LabelledGanLoss(object):
+
+    def __init__(self, real_label=None, fake_label=None, underlying_loss=None):
+        assert(real_label is not None)
+        assert(fake_label is not None)
+        assert(underlying_loss is not None)
+        self.loss = underlying_loss
+        self.fake_label = real_label
+        self.real_label = fake_label
+
+    def _compute_loss(self, x, label):
+        labels = torch.full(x.size(0), label, device=x.device)
+        return self.loss(x, labels)
+
+    def discrim_loss(self, fake=None, real=None):
+        fake = self._compute_loss(fake, self.fake_label)
+        real = self._compute_loss(real, self.real_label)
+        return fake + real
+
+    def gen_loss(self, fake=None):
+        return self._compute_loss(fake, self.REAL_EXAMPLE)
+
+class VanillaGanLoss(LabelledGanLoss):
+
+    def __init__(self, bce_loss=True):
+        loss = nn.BCEWithLogitsLoss() if bce_loss else nn.CrossEntropyLoss()
+        super().__init__(underlying_loss=loss, real_label=1, fake_label=1)
+
+class HingeGanLoss(LabelledGanLoss):
+
+    def __init__(self, margin=2.0):
+        self.loss = nn.HingeEmbeddingLoss(margin=margin)
+        super().__init__(underlying_loss=loss, real_label=1, fake_label=-1)
+
+class WassersteinGanLoss(object):
+
+    def __init__(self):
+        pass
+
+    def discrim_loss(self, fake=None, real=None):
+        return -(real.mean() - fake.mean())
+
+    def gen_loss(self, fake=None):
+        return -fake.mean()
+
+class CondGan(object):
+    def __init__(self, gen=None, discrims=None, cond_encoder=None, discrim_names=None):
+        assert(gen is not None)
+        assert(discrims is not None)
+        assert(len(discrims) >= 1)
+
+        if discrim_names is None:
+            discrim_names = [ 'discrim-%d' % i for i in range(len(discrims)) ]
+
+        self.gen = gen
+        self.discrims = discrims
+        self.cond_encoder = cond_encoder
+        self.discrim_names = discrim_names
+
+    # override me
+    def discrim_forward(self, name=None, discrim=None, real=None, fake=None, real_cond=None, fake_cond=None, loss=None):
+        if real_cond is not None and fake_cond is not None:
+            # real, correct captions => should predict "REAL"
+            real_cc = discrim(real, real_cond)
+            # real, incorrect captions => should predict "FAKE"
+            real_ic = discrim(real, fake_cond)
+            # fake, correct captions => should predict "FAKE"
+            fake_cc = discrim(fake, real_cond)
+
+            real_pred = real_cc
+            fake_pred = torch.cat((real_ic, fake_cc), dim=0)
+        else:
+            real_pred = discrim(real, None)
+            fake_pred = discrim(fake, None)
+
+        return loss(fake_pred, real_pred)
+
+    def gen_step(self, fake=None, cond=None, retain_graph=False, loss=None):
+        self.gen.zero_grad()
+        if self.cond_encoder is not None:
+            self.cond_encoder.zero_grad()
+
+        pred = []
+        for name, discrim in zip(self.discrim_names, self.discrims):
+            temp = discrim(fake, cond).mean()
+            pred.append(temp)
+
+        pred = torch.stack(pred)
+        return loss(pred)
+
+    def discrim_step(self, real=None, fake=None, cond=None, retain_graph=False, loss=None):
+        for discrim in self.discrims:
+            discrim.zero_grad()
+
+        if self.cond_encoder is not None:
+            self.cond_encoder.zero_grad()
+
+        losses = []
+        for name, discrim in zip(self.discrim_names, self.discrims):
+            real_cond = cond
+            fake_cond = cond
+            if cond is not None:
+                fake_cond = real_cond[gen_perm(real_cond.size(0))]
+
+            l = self.discrim_forward(name=name, discrim=discrim, real_cond=real_cond, fake_cond=fake_cond, real=real, fake=fake, loss=loss)
+
+            losses.append(l)
+
+        return torch.mean(torch.stack(losses))
+
+    def __call__(self, *args, **kwargs):
+        return self.gen(*args, **kwargs)
+
+    @property
+    def discrims_params(self):
+        return [ d.parameters() for d in self.discrims ]
+
+    def save_dict(self):
+        res = { 'gen': self.gen.state_dict()}
+        if self.cond_encoder is not None:
+            res.update({ 'cond': self.cond_encoder.state_dict() })
+        for name, discrim in zip(self.discrim_names, self.discrims):
+            res.update({name: discrim.state_dict()})
+
+        return res
+
+    def load_from_dict(self, to_load):
+        self.gen.load_state_dict(to_load['gen'])
+        if 'cond' in to_load:
+            assert(self.cond is not None)
+            self.cond.load_state_dict(to_load['cond'])
+        for name, discrim in zip(self.discrim_names, self.discrims):
+            if name in to_load:
+                discrim.load_state_dict(to_load[name])
+
+def gan_train(gan=None, num_epoch=None, dataset=None, device=None, optD=None, optG=None, params=None, losses=None):
+    from txt2vid.metrics import RollingAvgLoss
+
+    gen_loss = RollingAvgLoss(window_size=params.loss_window_size)
+    discrim_loss = RollingAvgLoss(window_size=params.loss_window_size)
+
+    writer = None
+    if params.use_writer:
+        writer = SummaryWriter()
+
+    for epoch in range(num_epoch):
+        if params.log_period > 0:
+            print('epoch=', epoch + 1)
+            sys.stdout.flush()
+
+        for i, (videos, captions, lengths) in enumerate(dataset):
+            iteration = epoch*len(dataset) + i + 1
+
+            videos = videos.to(device)
+            captions = captions.to(device)
+
+            batch_size = videos.size(0)
+            num_frames = videos.size(2)
+
+            cond = None
+            if gan.cond_encoder is not None:
+                _, _, cond = gan.cond_encoder(captions, lengths)
+                # TODO: fine-tune?
+                cond = cond.detach()
+
+            # TODO: configure prior sample space
+            latent = torch.randn(batch_size, gan.gen.latent_size, device=device)
+            fake = gan(latent, cond=cond)
+
+            # discrim step
+            total_discrim_loss = 0
+            for j in range(params.discrim_steps):
+                loss = gan.discrim_step(real=videos,
+                                        fake=fake.detach(),
+                                        cond=cond,
+                                        loss=losses.discrim_loss,
+                                        retain_graph=(j != params.discrim_steps - 1))
+
+
+                if params.mean_gen_loss:
+                    loss /= params.discrim_steps
+
+                optD.step()
+                total_discrim_loss += float(loss)
+
+                # TODO: normalisation step for discrim
+
+            discrim_loss.update(float(total_discrim_loss))
+
+            # generator
+            total_g_loss = 0
+            total_g_loss_recon = 0
+            for j in range(params.gen_steps):
+                if j != 0:
+                    fake = gan(fake_inp)
+
+                loss = gan.gen_step(fake=fake, cond=cond, loss=losses.gen_loss)
+                if params.mean_gen_loss:
+                    loss /= params.gen_steps
+
+                loss.backward(retain_graph=j != params.gen_steps - 1)
+                optG.step()
+
+                total_g_loss += float(loss)
+                # TODO: normalisation step for gen
+                
+            gen_loss.update(float(total_g_loss))
+
+            if iteration != 1 and iteration % params.save_example_period == 0:
+                to_save = {
+                    'optG': optG.state_dict(),
+                    'optD': optD.state_dict()
+                }
+                to_save.update(gan.save_dict())
+
+                torch.save(to_save, '%s/iter_%d_lossG_%.4f_lossD_%.4f' % (params.out, iteration, gen_loss.get(), discrim_loss.get()))
+
+                del to_save
+                to_save = None
+            
+            if params.log_period > 0 and iteration % params.log_period == 0:
+                gc.collect()
+                sys.stdout.flush()
+                print('[%d/%d][%d/%d] Loss_D: %.4f Loss_G: %.4f' % 
+                        (epoch, num_epoch, i, len(dataset), discrim_loss.get(), gen_loss.get()))
+
+            if params.save_example_period > 0:
+                if iteration == 1 or iteration % params.save_example_period == 0:
+                    to_save_real = videos
+                    to_save_fake = fake
+
+                    print(to_save_real.size())
+
+                    num_frames = to_save_real.size(1)
+
+                    # TODO: this is different
+                    # depending on the generator
+                    # so the generator should probs format or save examples
+                    # for now this is fine
+
+                    #to_save_real = to_save_real.permute(0, 2, 1, 3, 4)
+                    #to_save_fake = to_save_fake.permute(0, 2, 1, 3, 4).contiguous()
+                    to_save_real = to_save_real.view(-1, to_save_real.size(2), to_save_real.size(3), to_save_real.size(4))
+                    to_save_fake = to_save_fake.view(-1, to_save_fake.size(2), to_save_fake.size(3), to_save_fake.size(4))
+
+                    print('saving to %s' % params.out_samples)
+                    #print(to_save_real.size())
+                    vutils.save_image(to_save_real, '%s/real_samples.png' % params.out_samples, normalize=True, nrow=num_frames) #to_save_real.size(0))
+                    vutils.save_image(to_save_fake, '%s/fake_samples_epoch_%03d_iter_%06d.png' % (params.out_samples, epoch, iteration), normalize=True, nrow=num_frames)#to_save_fake.size(0))
+                    # TODO: check
+                    with open('%s/fake_sentences_epoch%03d_iter_%06d.txt' % (params.out_samples, epoch, iteration), 'w') as out_f:
+                        for cap in captions:
+                            out_f.write('%s\n' % cap)
+
+                    del to_save_fake
+
+def set_seed(seed):
+    if seed is None:
+        seed = random.randint(1, 100000)
+
+    random.seed(seed)
+    torch.manual_seed(seed)
+    return seed
+
+def setup_torch(use_cuda):
     cudnn.benchmark = True
+    if torch.cuda.is_available() and not use_cuda:
+        warn('cuda is available')
 
-    if torch.cuda.is_available() and not args.cuda:
-        warn('cuda is available, you probably want to use --cuda')
+    return torch.device("cuda:0" if args.cuda else "cpu")
 
+def main(args):
+    seed = set_seed(args.seed)
+    device = setup_torch(use_cuda=args.cuda)
+
+    status('Seed: %d' % seed)
+    status('Device set to: %s' % device)
+
+    # TODO: changeme
+    from txt2vid.models.discrim import Discrim
+    from txt2vid.models.gen import Gen
+    gen = Gen(z_slow_dim=256, z_fast_dim=256, out_channels=3, bottom_width=4, conv_ch=512, cond_dim=0).to(device)
+
+    discrim = Discrim().to(device)
+
+    discrims = [ discrim ]
+
+    if args.sent_encode_path:
+        status("Loading pre-trained sentence model from %s" % args.sent_encode_path)
+        txt_encoder = torch.load(args.sent_encode_path)
+        if 'txt' in txt_encoder:
+            txt_encoder = txt_encoder['txt'].to(device)
+        status("Sentence encode size = %d" % txt_encoder.encoding_size)
+    else:
+        status("Using random init sentence encoder")
+        txt_encoder = SentenceEncoder(embed_size=args.word_embed,
+                                      hidden_size=args.hidden_state, 
+                                      encoding_size=args.sent_encode, 
+                                      num_layers=args.txt_layers, 
+                                      vocab_size=len(vocab)).to(device)
+
+    gan = CondGan(gen=gen, discrims=discrims, cond_encoder=txt_encoder)
+    
     from util.dir import ensure_exists
     ensure_exists(args.out)
     ensure_exists(args.out_samples)
@@ -68,360 +385,41 @@ def main(args):
     import txt2vid.model
     txt2vid.model.USE_NORMAL_INIT=args.use_normal_init
 
-    device = torch.device("cuda:0" if args.cuda else "cpu")
-    ngpu = int(args.ngpu)
-
+    status('Loading vocab from %s' % args.vocab)
     vocab = load(args.vocab)
-    print(args.data)
+
+    status('Loading data from %s' % args.data)
     dataset = load_data(video_dir=args.data, anno=args.anno, vocab=vocab, batch_size=args.batch_size, val=False, num_workers=args.workers, num_channels=args.num_channels, random_frames=args.random_frames)
 
-    # TODO: params
-    if args.sent_encode_path:
-        txt_encoder = torch.load(args.sent_encode_path)
-        if 'txt' in txt_encoder:
-            txt_encoder = txt_encoder['txt'].to(device)
-    else:
-        txt_encoder = SentenceEncoder(embed_size=args.word_embed,
-                                      hidden_size=args.hidden_state, 
-                                      encoding_size=args.sent_encode, 
-                                      num_layers=args.txt_layers, 
-                                      vocab_size=len(vocab)).to(device)
+    optD = optim.Adam([ { "params": p } for p in gan.discrims_params ], lr=args.lr, betas=(args.beta1, args.beta2))
 
-    discrim = Discrim(txt_encode_size=txt_encoder.encoding_size,
-                      num_channels=args.num_channels).to(device)
-    gen = VideoGen(latent_size=(txt_encoder.encoding_size + args.latent_size), 
-                          num_channels=args.num_channels).to(device)
-    #frame_map = model.FrameMap(num_channels=args.num_channels).to(device)
-    #motion_discrim = model.MotionDiscrim(txt_encode_size=txt_encoder.encoding_size).to(device)
-    #frame_discrim = model.FrameDiscrim(txt_encode_size=txt_encoder.encoding_size).to(device)
-
-    C = args.weight_clip
-
-    optimizerD = optim.Adam([ 
-        { "params": discrim.parameters() }, 
-        #{ "params": txt_encoder.parameters() },
-    ], lr=args.lr, betas=(args.beta1, args.beta2))
-    optimizerG = optim.Adam([ 
+    optG = optim.Adam([ 
         { "params": gen.parameters() }, 
-        #{ "params": txt_encoder.parameters() } 
     ], lr=args.lr, betas=(args.beta1, args.beta2))
-
-    DISCRIM_STEPS = args.discrim_steps
-    GEN_STEPS = args.gen_steps
-
-    print("DISCRIM STEPS=", DISCRIM_STEPS)
 
     if args.model is not None:
         to_load = torch.load(args.model)
 
-        gen.load_state_dict(to_load['gen'])
-
-        discrim.load_state_dict(to_load['discrim'])
-
-        txt_encoder.load_state_dict(to_load['txt'])
-        optimizerD.load_state_dict(to_load['optD'])
-        optimizerG.load_state_dict(to_load['optG'])
+        gan.load_from_dict(to_load)
+        if 'optD' in to_load:
+            optD.load_state_dict(to_load['optD'])
+        if 'optG' in to_load:
+            optG.load_state_dict(to_load['optG'])
 
     print(discrim)
     print(gen)
     print(txt_encoder)
-    print(frame_map)
-    print(motion_discrim)
-    print(frame_discrim)
 
-    REAL_LABEL = 1
-    FAKE_LABEL = 0
     SAMPLE_LATENT_SIZE = args.latent_size
-
-    REAL_LABELS = torch.full((args.batch_size,), REAL_LABEL, device=device, dtype=torch.float, requires_grad=False)
-    FAKE_LABELS = torch.full((args.batch_size,), FAKE_LABEL, device=device, dtype=torch.float, requires_grad=False)
-
-    criteria = nn.BCEWithLogitsLoss()
-    recon = nn.L1Loss()
-    if args.recon_l2:
-        recon = nn.MSELoss()
 
     print("Vocab Size %d" % len(vocab))
     print("Dataset len= %d (%d batches)" % (len(dataset)*args.batch_size, len(dataset)))
 
-    REAL_LABELS_FRAMES = torch.full((16, args.batch_size), REAL_LABEL, device=device)
-    FAKE_LABELS_FRAMES = torch.full((16, args.batch_size), FAKE_LABEL, device=device)
-
-    def discrim_forward_cap(discrim=None, real_x=None, fake_x=None, correct_captions=None, incorrect_captions=None, device=device, real_labels=None, fake_labels=None):
-        # real, correct captions => should predict "REAL"
-        real_cc = discrim(real_x, correct_captions, device=device)
-        # real, incorrect captions => should predict "FAKE"
-        real_ic = discrim(real_x, incorrect_captions, device=device)
-        # fake, correct captions => should predict "FAKE"
-        fake_cc = discrim(fake_x, correct_captions, device=device)
-
-        real_pred = real_cc
-        fake_pred = torch.cat((real_ic, fake_cc), dim=0)
-
-        loss = 0.0
-        loss += criteria(real_cc, real_labels)
-        loss += criteria(real_ic, fake_labels) 
-        loss += criteria(fake_cc, fake_labels)
-        loss /= 3.0
-
-        #loss = -(torch.mean(real_pred) - torch.mean(fake_pred))
-        return loss
-
-    def gen_step_cap(nsteps=1, fake=None, fake_frames=None, cap_fv=None, real_labels=None, real_labels_frames=None, last=True, real_videos=None):
-        gen.zero_grad()
-        txt_encoder.zero_grad()
-
-        # ============
-        # forward fake with correct captions
-        # should all aim to fool discrim, i.e. predict "REAL"
-        # ============
-
-        real_labels_motion = real_labels_frames[0:-1, :] # (time, batch)
-
-        real_vids = discrim(vids=fake, sent=cap_fv, device=device)
-
-        real = (real_vids.mean() + real_frames.mean() + real_motion.mean()) / 3
-        loss = -real / nsteps
-
-        # don't think this is necessary
-        recon_loss = 0.0
-        if args.recon_lambda > 0:
-            recon_loss = recon(fake, real_videos) * args.recon_lambda
-            recon_loss /= nsteps
-            loss += recon_loss
-
-        loss.backward(retain_graph=not last)
-        return loss, recon_loss
-
-    def discrim_step_cap(nsteps=1, videos=None, cap_fv=None, real_labels=None, fake_labels=None, real_labels_frames=None, fake_labels_frames=None, last=True, fake=None, device=None):
-        txt_encoder.zero_grad()
-        discrim.zero_grad()
-
-        incorrect_captions = cap_fv[gen_perm(cap_fv.size(0))]
-
-        real_labels_motion = real_labels_frames[0:-1, :] # (time, batch)
-        fake_labels_motion = fake_labels_frames[0:-1, :]
-
-        fake_frames = frame_map(fake.detach())
-        frames = frame_map(videos.detach())
-
-        loss_d0 = discrim_forward(discrim=discrim, real_x=videos.detach(), fake_x=fake.detach(), correct_captions=cap_fv, incorrect_captions=incorrect_captions, device=device)
-        loss_d1 = discrim_forward(discrim=frame_discrim, real_x=frames, fake_x=fake_frames, correct_captions=cap_fv, incorrect_captions=incorrect_captions, device=device)
-        loss_d2 = discrim_forward(discrim=motion_discrim, real_x=frames, fake_x=fake_frames, correct_captions=cap_fv, incorrect_captions=incorrect_captions, device=device)
-
-        loss = torch.tensor([loss_d0, loss_d1, loss_d2], device=device, requires_grad=True)
-        loss = torch.mean(loss) / nsteps
-        loss.backward(retain_graph=not last)
-        return loss
-
-    # =================
-
-    def discrim_forward(discrim=None, real_x=None, fake_x=None, correct_captions=None, incorrect_captions=None, device=device, real_labels=None, fake_labels=None):
-        # real, correct captions => should predict "REAL"
-        real = discrim(real_x, device=device)
-        # fake, correct captions => should predict "FAKE"
-        fake = discrim(fake_x, device=device)
-
-        return -(torch.mean(real_pred) - torch.mean(fake_pred))
-
-    def gen_step(nsteps=1, fake=None, fake_frames=None, cap_fv=None, real_labels=None, real_labels_frames=None, last=True, real_videos=None):
-        gen.zero_grad()
-        #txt_encoder.zero_grad()
-
-        # ============
-        # forward fake with correct captions
-        # should all aim to fool discrim, i.e. predict "REAL"
-        # ============
-
-        real_labels_motion = real_labels_frames[0:-1, :] # (time, batch)
-
-        real_vids = discrim(vids=fake, sent=cap_fv, device=device)
-
-        real = real_vids
-        loss = -real / nsteps
-
-        # don't think this is necessary
-        recon_loss = 0.0
-        if args.recon_lambda > 0:
-            recon_loss = recon(fake, real_videos) * args.recon_lambda
-            recon_loss /= nsteps
-            loss += recon_loss
-
-        loss.backward(retain_graph=not last)
-        return loss, recon_loss
-
-    def discrim_step(nsteps=1, videos=None, cap_fv=None, real_labels=None, fake_labels=None, real_labels_frames=None, fake_labels_frames=None, last=True, fake=None, device=None):
-        discrim.zero_grad()
-
-        #incorrect_captions = cap_fv[gen_perm(cap_fv.size(0))]
-
-        #real_labels_motion = real_labels_frames[0:-1, :] # (time, batch)
-        #fake_labels_motion = fake_labels_frames[0:-1, :]
-
-        #fake_frames = frame_map(fake.detach())
-        #frames = frame_map(videos.detach())
-
-        loss_d0 = discrim_forward(discrim=discrim, real_x=videos.detach(), fake_x=fake.detach(), correct_captions=cap_fv, incorrect_captions=incorrect_captions, device=device)
-
-        loss = loss_d0
-        loss.backward(retain_graph=not last)
-        return loss
-
-    
-    from txt2vid.metrics import RollingAvgLoss
-
-    LOSS_WINDOW_SIZE=50
-    gen_loss = RollingAvgLoss(window_size=LOSS_WINDOW_SIZE)
-    gen_recon_loss = RollingAvgLoss(window_size=LOSS_WINDOW_SIZE)
-    discrim_loss = RollingAvgLoss(window_size=LOSS_WINDOW_SIZE)
-
-    #writer = SummaryWriter()
-
-    # TODO: when to backprop for txt_encoder
-    for epoch in range(args.epoch):
-        print('epoch=', epoch + 1)
-        sys.stdout.flush()
-
-        for i, (videos, captions, lengths) in enumerate(dataset):
-            iteration = epoch*len(dataset) + i
-
-            # TODO: hyper-params for GAN training
-            videos = videos.to(device).permute(0, 2, 1, 3, 4)
-            captions = captions.to(device)
-
-            batch_size = videos.size(0)
-            real_labels = REAL_LABELS[0:batch_size]
-            fake_labels = FAKE_LABELS[0:batch_size]
-
-            num_frames = videos.size(2)
-            real_labels_frames = REAL_LABELS_FRAMES[:, 0:batch_size]
-            fake_labels_frames = FAKE_LABELS_FRAMES[:, 0:batch_size]
-
-            #_, _, cap_fv = txt_encoder(captions, lengths)
-            #cap_fv = cap_fv.detach()
-
-            latent = torch.randn(batch_size, SAMPLE_LATENT_SIZE, device=device)
-            fake_inp = latent
-            #fake_inp = torch.cat((cap_fv, latent), dim=1)
-            fake_inp = fake_inp.view(fake_inp.size(0), fake_inp.size(1), 1, 1, 1)
-
-            fake = gen(fake_inp)
-
-            # discrim step
-            total_discrim_loss = 0
-            for j in range(DISCRIM_STEPS):
-                ld = discrim_step(nsteps=DISCRIM_STEPS, 
-                                  videos=videos,
-                                  cap_fv=cap_fv,
-                                  real_labels=real_labels, 
-                                  fake_labels=fake_labels,
-                                  real_labels_frames=real_labels_frames,
-                                  fake_labels_frames=fake_labels_frames,
-                                  fake=fake.detach(),
-                                  last=(j == DISCRIM_STEPS - 1),
-                                  device=device)
-                optimizerD.step()
-
-                names = [ 'video_discrim', 'frame_discrim', 'motion_discrim' ]
-                all_discrims  = [ discrim, frame_discrim, motion_discrim ]
-                for name, d in zip(names, all_discrims):
-                    def map_params(layer):
-                        layer_name = layer.__class__.__name__
-
-                        if 'Conv' in layer_name or 'Linear' in layer_name or 'BatchNorm' in layer_name:
-                            if hasattr(layer, 'weight') and layer.weight is not None:
-                                #writer.add_histogram('%s/%s/weight' % (name, layer_name), layer.weight.data.clone().cpu().numpy(), iteration)
-                                if 'BatchNorm' not in layer_name:
-                                    layer.weight.data.clamp_(-C, C)
-                            if hasattr(layer, 'bias') and layer.bias is not None:
-                                #writer.add_histogram('%s/%s/bias' % (name, layer_name), layer.bias.data.clone().cpu().numpy(), iteration)
-                                if 'BatchNorm' not in layer_name:
-                                    layer.bias.data.clamp_(-C, C)
-
-
-                    d.apply(map_params)
-
-                    #for name, p in d.named_parameters():
-                        #p.data.clamp_(-C, C)
-
-                
-                total_discrim_loss += float(ld)
-
-            discrim_loss.update(float(total_discrim_loss))
-
-            #_, _, cap_fv = txt_encoder(captions, lengths)
-            #fake_inp = torch.cat((cap_fv, latent), dim=1)
-            #fake = gen(fake_inp)
-            fake_frames = frame_map(fake)
-
-            # generator
-            total_g_loss = 0
-            total_g_loss_recon = 0
-            for j in range(GEN_STEPS):
-                if j != 0:
-                    fake = gen(fake_inp)
-
-                lg, lgr = gen_step(nsteps=GEN_STEPS, 
-                                   fake=fake, 
-                                   fake_frames=fake_frames,
-                                   cap_fv=cap_fv,
-                                   real_labels=real_labels,
-                                   real_labels_frames=real_labels_frames,
-                                   real_videos=videos,
-                                   last=(j == GEN_STEPS - 1))
-                total_g_loss += float(lg)
-                total_g_loss_recon += float(lgr)
-
-                optimizerG.step()
-                
-            gen_loss.update(float(total_g_loss))
-            gen_recon_loss.update(float(total_g_loss_recon))
-
-            if iteration != 0 and iteration % 100 == 0:
-                
-                to_save = {
-                    'gen': gen.state_dict(),
-                    'discrim': discrim.state_dict(),
-                    'frame_map': frame_map.state_dict(),
-                    'frame_discrim': frame_discrim.state_dict(),
-                    'motion_discrim': motion_discrim.state_dict(),
-                    'txt': txt_encoder.state_dict(),
-                    'optG': optimizerG.state_dict(),
-                    'optD': optimizerD.state_dict()
-                }
-
-                torch.save(to_save, '%s/iter_%d_lossG_%.4f_lossD_%.4f' % (args.out, iteration, gen_loss.get(), discrim_loss.get()))
-
-                del to_save
-                to_save = None
-
-            if iteration % 10 == 0:
-                gc.collect()
-                sys.stdout.flush()
-                print('[%d/%d][%d/%d] Loss_D: %.4f Loss_G: %.4f (recon = %.4f)' % 
-                        (epoch, args.epoch, i, len(dataset), discrim_loss.get(), gen_loss.get(), gen_recon_loss.get()))
-
-            if iteration % 100 == 0:
-                # TODO: output sentences
-                to_save_real = videos
-                to_save_fake = fake
-
-                num_frames = to_save_real.size(2)
-
-                #print(captions[0])
-                to_save_real = to_save_real.permute(0, 2, 1, 3, 4)
-                to_save_real = to_save_real.view(-1, to_save_real.size(2), to_save_real.size(3), to_save_real.size(4))
-                to_save_fake = to_save_fake.permute(0, 2, 1, 3, 4).contiguous()
-                to_save_fake = to_save_fake.view(-1, to_save_fake.size(2), to_save_fake.size(3), to_save_fake.size(4))
-
-                print('saving to %s' % args.out_samples)
-                #print(to_save_real.size())
-                vutils.save_image(to_save_real, '%s/real_samples.png' % args.out_samples, normalize=True, nrow=num_frames) #to_save_real.size(0))
-                vutils.save_image(to_save_fake, '%s/fake_samples_epoch_%03d_iter_%06d.png' % (args.out_samples, epoch, iteration), normalize=True, nrow=num_frames)#to_save_fake.size(0))
-
-                del to_save_fake
-
-
+    params = TrainParams().read_from(args)
+    print(device)
+    # TODO: load loss dynamically
+    losses = WassersteinGanLoss()
+    gan_train(gan=gan, num_epoch=args.epoch, dataset=dataset, device=device, optD=optD, optG=optG, params=params, losses=losses)
 
 
 if __name__ == '__main__':
@@ -429,7 +427,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--seed', type=int, default=None, help='Seed to use')
     parser.add_argument('--cuda', action='store_true', help='enables cuda')
-    parser.add_argument('--ngpu', type=int, default=1, help='number of GPUs to use')
+    #parser.add_argument('--ngpu', type=int, default=1, help='number of GPUs to use')
     parser.add_argument('--workers', type=int, default=2, help='number of workers to help with loading/pre-processing data')
 
     parser.add_argument('--epoch', type=int, default=5, help='number of epochs to perform')

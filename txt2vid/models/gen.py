@@ -42,15 +42,18 @@ class VideoFrameGenerator(nn.Module):
         x = F.tanh(self.dc5(h))
         return x
 
-class VideoGen(nn.Module):
-    def __init__(self, z_slow_dim=256, z_fast_dim=256, out_channels=3, bottom_width=4, conv_ch=512):
+class Gen(nn.Module):
+    def __init__(self, z_slow_dim=256, z_fast_dim=256, cond_dim=0, out_channels=3, bottom_width=4, conv_ch=512):
         from txt2vid.models.temporal_gen import FrameSeedGenerator
         super().__init__()
+        self.z_slow_plus_cond_dim = z_slow_dim + cond_dim
         self.z_slow_dim = z_slow_dim
         self.z_fast_dim = z_fast_dim
         self.out_channels = out_channels
         self._fsgen = FrameSeedGenerator(z_slow_dim, z_fast_dim)
-        self._vgen = VideoFrameGenerator(z_slow_dim,z_fast_dim, out_channels, bottom_width,conv_ch)
+        self._vgen = VideoFrameGenerator(z_slow_dim, z_fast_dim, out_channels, bottom_width,conv_ch)
+
+        #self.cond_combine = nn.Linear(self.z_slow_plus_cond_dim, self.z_slow_dim)
 
     def generate_input(self, batch_size=16):
         """
@@ -59,8 +62,14 @@ class VideoGen(nn.Module):
         z_slow = torch.randn(batch_size, self.z_slow_dim)
         return z_slow
 
-    def forward(self, z_slow):
+    def forward(self, z_slow, cond=None):
+        # TODO
+        #if cond is not None:
+        #    z_slow_plus_cond = torch.cat((z_slow, cond), dim=1)
+        #    z_slow = self.cond_combine(z_slow_plus_cond)
+
         z_fast = self._fsgen(z_slow)
+
         B, n_z_fast, n_frames = z_fast.size()
         z_fast = z_fast.permute(0, 2, 1).contiguous().view(B * n_frames, n_z_fast) #squash time dimension in batch dimension
 
@@ -72,10 +81,14 @@ class VideoGen(nn.Module):
         out = out.view(B, n_frames, self.out_channels, 64, 64)
         return out
 
+    @property
+    def latent_size(self):
+        return self.z_slow_dim
+
 if __name__ == "__main__":
     # The number of frames in a video is fixed at 16
     batch_size = 8
-    gen = VideoGen()
+    gen = Gen()
     z_slow = Variable(gen.generate_input(batch_size))
     out = gen(z_slow)
     print("Output video generator:", out.size())

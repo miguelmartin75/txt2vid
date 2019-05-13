@@ -17,7 +17,8 @@ class Discrim(nn.Module):
         self.bn2 = nn.BatchNorm3d(mid_ch * 4)
         self.bn3 = nn.BatchNorm3d(mid_ch * 8)
 
-    def forward(self, x):
+    def forward(self, vids=None, sent=None):
+        x = vids
         if self.sequence_first:
             x = x.permute(0, 2, 1, 3, 4)
 

@@ -83,7 +83,6 @@ class SynthDataset(data.Dataset):
         assert(cache.exists())
         
         frames = []
-        #if cache.exists():
         for frame_path in cache.iterdir():
             if frame_path.suffix != '.jpg' and frame_path.suffix != '.png':
                 continue
@@ -91,16 +90,6 @@ class SynthDataset(data.Dataset):
             frames.append(int(frame_path.stem))
 
         frames.sort()
-
-        #else:
-        #    cache.mkdir()
-
-        #    for frame in read_video_file(self.get_video_path(vid), vid=vid, cache=cache):
-        #        if self.transform:
-        #            frame = self.transform(frame)
-
-        #        frames.append(frame)
-
 
         if self.random_frames == 0:
             new_frames = []

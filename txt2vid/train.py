@@ -213,7 +213,7 @@ class CondGan(object):
                 discrim.load_state_dict(to_load[name])
 
 def gan_train(gan=None, num_epoch=None, dataset=None, device=None, optD=None, optG=None, params=None, losses=None):
-    from txt2vid.metrics import RollingAvgLoss
+    from txt2vid.util.metrics import RollingAvgLoss
 
     gen_loss = RollingAvgLoss(window_size=params.loss_window_size)
     discrim_loss = RollingAvgLoss(window_size=params.loss_window_size)

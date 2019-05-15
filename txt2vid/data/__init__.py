@@ -243,6 +243,19 @@ def get_loader(video_dir, captions, vocab, transform, batch_size, shuffle, num_w
                                               collate_fn=collate_fn)
     return data_loader
 
+def load_data(video_dir=None, vocab=None, anno=None, batch_size=64, val=False, num_workers=4, num_channels=3, random_frames=0, frame_size=64):
+    if num_channels == 3:
+        transform = transforms.Compose([transforms.Resize((frame_size, frame_size)),
+                                        transforms.ToTensor(),
+                                        transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
+    else:
+        transform = transforms.Compose([transforms.Resize((frame_size, frame_size)),
+                                        transforms.Grayscale(),
+                                        transforms.ToTensor(),
+                                        transforms.Normalize([0.5], [0.5])])
+
+    return get_loader(video_dir, anno, vocab, transform, batch_size, shuffle=not val, num_workers=num_workers, random_frames=random_frames)
+
 def main(args):
     from util.pickle import load
     ex_to_sent = load(args.sents)

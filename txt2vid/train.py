@@ -21,31 +21,23 @@ from util.log import status, warn, error
 from util.pickle import load
 from util.misc import gen_perm
 
-# TODO: load from args
-FRAME_SIZE=64
-
-def load_data(video_dir=None, vocab=None, anno=None, batch_size=64, val=False, num_workers=4, num_channels=3, random_frames=0):
-    # TODO
+def load_data(video_dir=None, vocab=None, anno=None, batch_size=64, val=False, num_workers=4, num_channels=3, random_frames=0, frame_size=64):
     from data import get_loader
 
     if num_channels == 3:
-        transform = transforms.Compose([transforms.Resize((FRAME_SIZE, FRAME_SIZE)),
+        transform = transforms.Compose([transforms.Resize((frame_size, frame_size)),
                                         transforms.ToTensor(),
                                         transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
     else:
-        transform = transforms.Compose([transforms.Resize((FRAME_SIZE, FRAME_SIZE)),
+        transform = transforms.Compose([transforms.Resize((frame_size, frame_size)),
                                         transforms.Grayscale(),
                                         transforms.ToTensor(),
-                                        transforms.Normalize([0.5],[0.5])])
+                                        transforms.Normalize([0.5], [0.5])])
 
     return get_loader(video_dir, anno, vocab, transform, batch_size, shuffle=not val, num_workers=num_workers, random_frames=random_frames)
 
-# parameters for the training algorithm
+# constants for the training algorithm
 class TrainParams(object):
-    # algorithm constants
-    discrim_steps = 1
-    gen_steps = 1
-
     # if true, will divide each step by discrim/gen_steps respectively
     mean_discrim_loss = True
     mean_gen_loss = True
@@ -64,8 +56,6 @@ class TrainParams(object):
     save_example_period = 100
     # period to save trained models, <= 0 to not
     save_model_period = 100
-
-    out_samples_dir = None
 
     def __init__(self):
         pass
@@ -94,7 +84,7 @@ class LabelledGanLoss(object):
         real = self._compute_loss(real, self.real_label)
         return fake + real
 
-    def gen_loss(self, fake=None):
+    def gen_loss(self, fake=None, real=None):
         return self._compute_loss(fake, self.REAL_EXAMPLE)
 
 class VanillaGanLoss(LabelledGanLoss):
@@ -117,8 +107,20 @@ class WassersteinGanLoss(object):
     def discrim_loss(self, fake=None, real=None):
         return -(real.mean() - fake.mean())
 
-    def gen_loss(self, fake=None):
+    def gen_loss(self, fake=None, real=None):
         return -fake.mean()
+
+class MixedGanLoss(object):
+
+    def __init__(self, g_loss=None, d_loss=None):
+        self.g_loss = g_loss
+        self.d_loss = d_loss
+
+    def discrim_loss(self, fake=None, real=None):
+        return self.d_loss.discrim_loss(fake=fake, real=real)
+
+    def gen_loss(self, fake=None, real=None):
+        return self.g_loss.gen_loss(fake=fake, real=real)
 
 class CondGan(object):
     def __init__(self, gen=None, discrims=None, cond_encoder=None, discrim_names=None):
@@ -346,6 +348,20 @@ def setup_torch(use_cuda):
 
     return torch.device("cuda:0" if args.cuda else "cpu")
 
+def create_object(json_file_path, **kwargs):
+    import json
+    with open(json_file_path) as in_f:
+        params = json.load(in_f)
+    assert('class' in params)
+
+    from util.reflection import get_class
+    clz = get_class(params['class'])
+
+    if 'args' in params:
+        return clz(**params['args'])
+
+    return clz()
+
 def main(args):
     seed = set_seed(args.seed)
     device = setup_torch(use_cuda=args.cuda)
@@ -353,14 +369,16 @@ def main(args):
     status('Seed: %d' % seed)
     status('Device set to: %s' % device)
 
-    # TODO: changeme
-    from txt2vid.models.discrim import Discrim
-    from txt2vid.models.gen import Gen
-    gen = Gen(z_slow_dim=256, z_fast_dim=256, out_channels=3, bottom_width=4, conv_ch=512, cond_dim=0).to(device)
+    gen = create_object(args.G).to(device)
+    discrims = [ create_object(d).to(device) for d in args.D ]
 
-    discrim = Discrim().to(device)
+    # TODO
+    #gen.init(args.init_method)
+    #for discrim in discrims:
+    #    discrim.init(args.init_method)
 
-    discrims = [ discrim ]
+    status('Loading vocab from %s' % args.vocab)
+    vocab = load(args.vocab)
 
     if args.sent_encode_path:
         status("Loading pre-trained sentence model from %s" % args.sent_encode_path)
@@ -370,6 +388,7 @@ def main(args):
         status("Sentence encode size = %d" % txt_encoder.encoding_size)
     else:
         status("Using random init sentence encoder")
+        txt_encoder = create_object(args.sent, vocab_size=len(vocab))
         txt_encoder = SentenceEncoder(embed_size=args.word_embed,
                                       hidden_size=args.hidden_state, 
                                       encoding_size=args.sent_encode, 
@@ -381,12 +400,6 @@ def main(args):
     from util.dir import ensure_exists
     ensure_exists(args.out)
     ensure_exists(args.out_samples)
-
-    import txt2vid.model
-    txt2vid.model.USE_NORMAL_INIT=args.use_normal_init
-
-    status('Loading vocab from %s' % args.vocab)
-    vocab = load(args.vocab)
 
     status('Loading data from %s' % args.data)
     dataset = load_data(video_dir=args.data, anno=args.anno, vocab=vocab, batch_size=args.batch_size, val=False, num_workers=args.workers, num_channels=args.num_channels, random_frames=args.random_frames)
@@ -410,8 +423,6 @@ def main(args):
     print(gen)
     print(txt_encoder)
 
-    SAMPLE_LATENT_SIZE = args.latent_size
-
     print("Vocab Size %d" % len(vocab))
     print("Dataset len= %d (%d batches)" % (len(dataset)*args.batch_size, len(dataset)))
 
@@ -425,49 +436,45 @@ def main(args):
 if __name__ == '__main__':
     # TODO: args
     parser = argparse.ArgumentParser()
+    # General setup stuff
     parser.add_argument('--seed', type=int, default=None, help='Seed to use')
     parser.add_argument('--cuda', action='store_true', help='enables cuda')
-    #parser.add_argument('--ngpu', type=int, default=1, help='number of GPUs to use')
     parser.add_argument('--workers', type=int, default=2, help='number of workers to help with loading/pre-processing data')
-
-    parser.add_argument('--epoch', type=int, default=5, help='number of epochs to perform')
-
-    parser.add_argument('--model', type=str, help='pretrained model', default=None)
-
-    parser.add_argument('--data', type=str, help='video directory', required=True)
-    parser.add_argument('--anno', type=str, help='annotation location', required=True)
-    parser.add_argument('--vocab', type=str, help='vocab location', required=True)
-    parser.add_argument('--batch_size', type=int, default=64, help='input batch size')
-
-    parser.add_argument('--lr', type=float, default=0.0001, help='learning rate')
-    parser.add_argument('--beta1', type=float, default=0.5, help='beta1 for adam')
-    parser.add_argument('--beta2', type=float, default=0.9, help='beta1 for adam')
-    
-    parser.add_argument('--gen_steps', type=int, default=1, help='Number of generator steps to use per iteration')
-    parser.add_argument('--discrim_steps', type=int, default=1, help='Number of discriminator steps to use per iteration')
-
-    parser.add_argument('--sent_encode_path', type=str, default=None, help='Initial model for the sentence encoder')
-
-    parser.add_argument('--word_embed', type=int, default=128, help='Dimensionality of each word (sentence model)')
-    parser.add_argument('--hidden_state', type=int, default=256, help='Dimensionality of hidden state (sentence model)')
-    parser.add_argument('--txt_layers', type=int, default=3, help='Number of layers in the sentence model')
-    parser.add_argument('--sent_encode', type=int, default=256, help='Encoding for the sentence')
-
-    parser.add_argument('--latent_size', type=int, default=256, help='Additional number of dimensions for random variable')
-    parser.add_argument('--frame_latent_size', type=int, default=256, help='Latent size for each frame')
-
-    parser.add_argument('--recon_lambda', type=float, default=0.1, help='Multiplier for reconstruction loss')
-    parser.add_argument('--recon_l2', action='store_true', help='Use L2 loss for recon')
-
-    parser.add_argument('--use_normal_init', type=int, default=0, help='Use normal init')
+    #parser.add_argument('--ngpu', type=int, default=1, help='number of GPUs to use')
 
     parser.add_argument('--out', type=str, default='out', help='dir output path')
     parser.add_argument('--out_samples', type=str, default='out_samples', help='dir output path')
 
+    parser.add_argument('--frame_size', type=int, default=64, help='frame size')
     parser.add_argument('--num_channels', type=int, default=1, help='number of channels in input')
     parser.add_argument('--random_frames', type=int, default=0, help='use random frames')
 
-    parser.add_argument('--weight_clip', type=float, default=0.01, help='weight clip value')
+    # Training params
+    parser.add_argument('--epoch', type=int, default=5, help='number of epochs to perform')
+    parser.add_argument('--batch_size', type=int, default=64, help='input batch size')
+    parser.add_argument('--init_method', type=str, default='xavier', help='method for initialisation')
+
+    parser.add_argument('--gen_steps', type=int, default=1, help='Number of generator steps to use per iteration')
+    parser.add_argument('--G_lr', type=float, default=0.0001, help='learning rate for G')
+    parser.add_argument('--G_beta1', type=float, default=0.5, help='beta1 for adam for G')
+    parser.add_argument('--G_beta2', type=float, default=0.9, help='beta1 for adam for G')
+
+    parser.add_argument('--discrim_steps', type=int, default=2, help='Number of discriminator steps to use per iteration')
+    parser.add_argument('--D_lr', type=float, default=0.0001, help='learning rate for D')
+    parser.add_argument('--D_beta1', type=float, default=0.5, help='beta1 for adam for D')
+    parser.add_argument('--D_beta2', type=float, default=0.9, help='beta1 for adam for D')
+
+    parser.add_argument('--weights', type=str, help='pretrained weights for G and D', default=None)
+    parser.add_argument('--sent_weights', type=str, default=None, help='pretrained model for the sentence encoder')
+
+    parser.add_argument('--data', type=str, help='video directory', required=True)
+    parser.add_argument('--anno', type=str, help='annotation location', required=True)
+    parser.add_argument('--vocab', type=str, help='vocab location', required=True)
+
+    # Model specific
+    parser.add_argument('--G', type=str, default=None, help='G model', required=True)
+    parser.add_argument('--D', type=str, default=None, nargs='+', help='D model(s)', required=True)
+    parser.add_argument('--sent', type=str, default=None, help='Sentence model')
 
     args = parser.parse_args()
     main(args)

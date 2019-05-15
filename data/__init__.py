@@ -38,7 +38,7 @@ def read_video_file(video_path, vid, cache=None):
 
     video.release()
 
-class SynthDataset(data.Dataset):
+class Dataset(data.Dataset):
 
     def get_video_path(self, vid_id):
         return '%s/%s.avi' % (self.video_dir, vid_id)
@@ -234,7 +234,7 @@ def collate_fn(data):
 
 def get_loader(video_dir, captions, vocab, transform, batch_size, shuffle, num_workers, random_frames):
     """Returns torch.utils.data.DataLoader for custom coco dataset."""
-    dset = SynthDataset(video_dir=video_dir, vocab=vocab, captions=captions, transform=transform, random_frames=random_frames) 
+    dset = Dataset(video_dir=video_dir, vocab=vocab, captions=captions, transform=transform, random_frames=random_frames) 
 
     data_loader = torch.utils.data.DataLoader(dataset=dset, 
                                               batch_size=batch_size,

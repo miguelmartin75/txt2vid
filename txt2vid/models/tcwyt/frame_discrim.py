@@ -1,3 +1,6 @@
+import torch
+import torch.nn as nn
+
 class FrameMap(nn.Module):
     def __init__(self, num_channels=3):
         super().__init__()
@@ -19,8 +22,6 @@ class FrameMap(nn.Module):
             nn.BatchNorm2d(512),
             nn.LeakyReLU(0.2, True),
         )
-
-        self.apply(weights_init)
 
 
     def forward(self, videos):
@@ -63,19 +64,17 @@ class FrameDiscrim(nn.Module):
             nn.LeakyReLU(0.2, True)
         )
 
-        self.apply(weights_init)
-
-    def forward(self, frames, sent=None, device=None):
-        sent = self.sent_map(sent)
+    def forward(self, x=None, cond=None, xbar=None):
+        sent = self.sent_map(cond)
 
         outputs = []
         # input is frame x batch x ch x h x w
         # loop through each frame
-        for i in range(frames.size(0)): 
-            frame = frames[i, :, :, :, :]
+        for i in range(xbar.size(0)): 
+            frame = xbar[i, :, :, :, :]
             frame = self.frame_map(frame)
 
-            sent_dupe = torch.zeros(sent.size(0), sent.size(1), frame.size(2), frame.size(3), device=device)
+            sent_dupe = torch.zeros(sent.size(0), sent.size(1), frame.size(2), frame.size(3), device=xbar.device)
 
             for i in range(frame.size(2)):
                 for j in range(frame.size(3)):
@@ -88,7 +87,7 @@ class FrameDiscrim(nn.Module):
             output = output.view(output.size(0), -1).squeeze(1)
             outputs.append(output)
 
-        return torch.stack(outputs, 0).to(device)
+        return torch.stack(outputs, 0).to(xbar.device)
 
 if __name__ == '__main__':
     # TODO

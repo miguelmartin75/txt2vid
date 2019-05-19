@@ -44,7 +44,7 @@ class VideoFrameGenerator(nn.Module):
 
 class Gen(nn.Module):
     def __init__(self, z_slow_dim=256, z_fast_dim=256, cond_dim=0, out_channels=3, bottom_width=4, conv_ch=512):
-        from txt2vid.models.temporal_gen import FrameSeedGenerator
+        from txt2vid.models.tgan.temporal_gen import FrameSeedGenerator
         super().__init__()
         self.z_slow_plus_cond_dim = z_slow_dim + cond_dim
         self.z_slow_dim = z_slow_dim

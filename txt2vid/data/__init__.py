@@ -1,13 +1,15 @@
 from pathlib import Path
 
-import torch
-import torchvision.transforms as transforms
-import torch.utils.data as data
+import numpy as np
 
 import cv2
 from PIL import Image
 
-import numpy as np
+import torch
+import torchvision.transforms as transforms
+import torch.utils.data as data
+
+from txt2vid.util.pick import load
 
 def to_pil(cv2_img):
     cv2_img = cv2.cvtColor(cv2_img, cv2.COLOR_BGR2RGB)
@@ -48,7 +50,6 @@ class Dataset(data.Dataset):
 
 
     def __init__(self, video_dir=None, vocab=None, captions=None, transform=None, random_frames=0):
-        from util.pickle import load
         self.video_dir = video_dir
         self.transform = transform
         self.random_frames = random_frames
@@ -243,13 +244,16 @@ def get_loader(video_dir, captions, vocab, transform, batch_size, shuffle, num_w
                                               collate_fn=collate_fn)
     return data_loader
 
-def load_data(video_dir=None, vocab=None, anno=None, batch_size=64, val=False, num_workers=4, num_channels=3, random_frames=0, frame_size=64):
+def load_data(video_dir=None, vocab=None, anno=None, batch_size=64, val=False, num_workers=4, num_channels=3, random_frames=0, frame_size=[64]):
+    if len(frame_size) == 1:
+        frame_size.append(frame_size[0])
+
     if num_channels == 3:
-        transform = transforms.Compose([transforms.Resize((frame_size, frame_size)),
+        transform = transforms.Compose([transforms.Resize(frame_size),
                                         transforms.ToTensor(),
                                         transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
     else:
-        transform = transforms.Compose([transforms.Resize((frame_size, frame_size)),
+        transform = transforms.Compose([transforms.Resize(frame_size),
                                         transforms.Grayscale(),
                                         transforms.ToTensor(),
                                         transforms.Normalize([0.5], [0.5])])
@@ -257,7 +261,6 @@ def load_data(video_dir=None, vocab=None, anno=None, batch_size=64, val=False, n
     return get_loader(video_dir, anno, vocab, transform, batch_size, shuffle=not val, num_workers=num_workers, random_frames=random_frames)
 
 def main(args):
-    from util.pickle import load
     ex_to_sent = load(args.sents)
     sentences = [ s for x in ex_to_sent for s in ex_to_sent[x] ]
 

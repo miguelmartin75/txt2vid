@@ -3,11 +3,15 @@
 # 
 # maybe use python logging module
 
+def readable_timestamp():
+    import datetime
+    return datetime.datetime.now()
+
 def status(msg):
-    print('[STATUS]: %s' % msg)
+    print('%s [STATUS]: %s' % (readable_timestamp(), msg))
 
 def warn(msg):
-    print('[WARNING]: %s' % msg)
+    print('%s [WARNING]: %s' % (readable_timestamp(), msg))
 
 def error(msg):
-    print('[ERROR]: %s' % msg)
+    print('%s [ERROR]: %s' % (readable_timestamp(), msg))

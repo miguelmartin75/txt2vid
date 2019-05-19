@@ -1,6 +1,9 @@
-class Discrim(nn.Module):
+import torch
+import torch.nn as nn
 
-    def __init__(self, txt_encode_size=256, num_filters=64, num_channels=1):
+class VideoDiscrim(nn.Module):
+
+    def __init__(self, txt_encode_size=256, num_filters=64, num_channels=3):
         super().__init__()
 
         self.vid = nn.Sequential(
@@ -18,7 +21,7 @@ class Discrim(nn.Module):
 
             nn.Conv3d(256, 512, 4, 2, 1, bias=False), # 256
             nn.BatchNorm3d(512),
-            nn.LeakyReLU(0.2, True),
+            #nn.LeakyReLU(0.2, True),
             # ===
 
 
@@ -46,11 +49,9 @@ class Discrim(nn.Module):
             #nn.Sigmoid()
         )
 
-        self.apply(weights_init)
-
-    def forward(self, x=None, cond=None):
-        sent = self.sent_map(sent)
-        vids = self.vid(vids)
+    def forward(self, x=None, cond=None, xbar=None):
+        sent = self.sent_map(cond)
+        vids = self.vid(x)
 
         sent_temp = torch.zeros((vids.size(0), sent.size(1), vids.size(2), vids.size(3), vids.size(4)), device=x.device)
         for i in range(vids.size(2)):

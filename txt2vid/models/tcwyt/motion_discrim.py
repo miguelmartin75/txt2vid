@@ -1,3 +1,6 @@
+import torch
+import torch.nn as nn
+
 class MotionDiscrim(nn.Module):
     def __init__(self, txt_encode_size=256):
         super().__init__()
@@ -25,11 +28,9 @@ class MotionDiscrim(nn.Module):
             nn.LeakyReLU(0.2, True)
         )
 
-        self.apply(weights_init)
-
-    def forward(self, frames, sent=None, device=None):
-        sent = self.sent_map(sent)
-        motions = frames[1:] - frames[0:-1]
+    def forward(self, x=None, cond=None, xbar=None):
+        sent = self.sent_map(cond)
+        motions = xbar[1:] - xbar[0:-1]
 
         outputs = []
         # loop through each motion 'frame'
@@ -37,7 +38,7 @@ class MotionDiscrim(nn.Module):
             motion = motions[i, :, :, :, :]
             motion = self.motion_map(motion)
 
-            sent_dupe = torch.zeros((sent.size(0), sent.size(1), motion.size(2), motion.size(3)), device=device)
+            sent_dupe = torch.zeros((sent.size(0), sent.size(1), motion.size(2), motion.size(3)), device=xbar.device)
 
             for i in range(motion.size(2)):
                 for j in range(motion.size(3)):
@@ -48,4 +49,4 @@ class MotionDiscrim(nn.Module):
             output = output.view(output.size(0), -1).squeeze(1)
             outputs.append(output)
 
-        return torch.stack(outputs, 0).to(device)
+        return torch.stack(outputs, 0).to(xbar.device)

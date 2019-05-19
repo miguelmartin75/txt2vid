@@ -7,85 +7,69 @@ import gc
 
 import torch
 import torch.nn as nn
-import torch.backends.cudnn as cudnn
 import torch.optim as optim
 import torch.utils.data
-import torchvision.utils as vutils
 from torchvision import transforms
 
-import txt2vid.model as model
-from txt2vid.data import Vocab
-from txt2vid.model import SentenceEncoder
-
-from util.log import status, warn, error
-from util.pickle import load
-from util.misc import gen_perm
-
-def set_seed(seed):
-    if seed is None:
-        seed = random.randint(1, 100000)
-
-    random.seed(seed)
-    torch.manual_seed(seed)
-    return seed
-
-def setup_torch(use_cuda):
-    cudnn.benchmark = True
-    if torch.cuda.is_available() and not use_cuda:
-        warn('cuda is available')
-
-    return torch.device("cuda:0" if args.cuda else "cpu")
+from txt2vid.data import Vocab, load_data
+from txt2vid.train.setup import setup
+from txt2vid.gan.trainer import train, add_params_to_parser
+from txt2vid.gan.losses import MixedGanLoss
+from txt2vid.util.log import status, warn, error
+from txt2vid.util.pick import load
+from txt2vid.util.misc import gen_perm
+from txt2vid.util.reflection import create_object
+from txt2vid.util.torch.init import init
+from txt2vid.gan.cond_gan import CondGan
 
 def main(args):
-    seed = set_seed(args.seed)
-    device = setup_torch(use_cuda=args.cuda)
-
-    status('Seed: %d' % seed)
-    status('Device set to: %s' % device)
-
-    gen = create_object(args.G).to(device)
-    discrims = [ create_object(d).to(device) for d in args.D ]
-
-    # TODO
-    #gen.init(args.init_method)
-    #for discrim in discrims:
-    #    discrim.init(args.init_method)
+    seed, device = setup(args)
 
     status('Loading vocab from %s' % args.vocab)
     vocab = load(args.vocab)
 
-    if args.sent_encode_path:
-        status("Loading pre-trained sentence model from %s" % args.sent_encode_path)
-        txt_encoder = torch.load(args.sent_encode_path)
+    if args.sent_weights:
+        status("Loading pre-trained sentence model from %s" % args.sent_weights)
+        txt_encoder = torch.load(args.sent_weights)
         if 'txt' in txt_encoder:
             txt_encoder = txt_encoder['txt'].to(device)
         status("Sentence encode size = %d" % txt_encoder.encoding_size)
     else:
         status("Using random init sentence encoder")
-        txt_encoder = create_object(args.sent, vocab_size=len(vocab))
-        txt_encoder = SentenceEncoder(embed_size=args.word_embed,
-                                      hidden_size=args.hidden_state, 
-                                      encoding_size=args.sent_encode, 
-                                      num_layers=args.txt_layers, 
-                                      vocab_size=len(vocab)).to(device)
+        txt_encoder = create_object(args.sent, vocab_size=len(vocab)).to(device)
+        if args.sent_init_method is None:
+            args.sent_init_method = args.init_method
+        init(txt_encoder, init_method=args.sent_init_method)
 
-    gan = CondGan(gen=gen, discrims=discrims, cond_encoder=txt_encoder)
-    
-    from util.dir import ensure_exists
-    ensure_exists(args.out)
-    ensure_exists(args.out_samples)
+    cond_dim = txt_encoder.encoding_size
 
-    status('Loading data from %s' % args.data)
-    dataset = load_data(video_dir=args.data, anno=args.anno, vocab=vocab, batch_size=args.batch_size, val=False, num_workers=args.workers, num_channels=args.num_channels, random_frames=args.random_frames)
+    gen = create_object(args.G, cond_dim=cond_dim).to(device)
+    discrims = [ create_object(d).to(device) for d in args.D ]
 
-    optD = optim.Adam([ { "params": p } for p in gan.discrims_params ], lr=args.lr, betas=(args.beta1, args.beta2))
+    init(gen, init_method=args.init_method)
+    for discrim in discrims:
+        init(discrim, init_method=args.init_method)
 
-    optG = optim.Adam([ 
-        { "params": gen.parameters() }, 
-    ], lr=args.lr, betas=(args.beta1, args.beta2))
+    sample_mapping = None
+    if args.M:
+        sample_mapping = create_object(args.M).to(device)
+        init(sample_mapping, init_method=args.init_method)
 
-    if args.model is not None:
-        to_load = torch.load(args.model)
+    gan = CondGan(gen=gen, discrims=discrims, cond_encoder=txt_encoder, sample_mapping=sample_mapping, discrim_names=args.D_names)
+
+    D_params = [ { "params": p } for p in gan.discrims_params ]
+    G_params = [ { "params": gen.parameters() } ]
+
+    if args.end2end:
+        # TODO: should I update txt_encoder in generator or discriminator exclusively?
+        D_params.append({"params": txt_encoder.parameters()})
+        G_params.append({"params": txt_encoder.parameters()})
+
+    optD = optim.Adam(D_params, lr=args.D_lr, betas=(args.D_beta1, args.D_beta2))
+    optG = optim.Adam(G_params, lr=args.G_lr, betas=(args.G_beta1, args.G_beta2))
+
+    if args.weights is not None:
+        to_load = torch.load(args.weights)
 
         gan.load_from_dict(to_load)
         if 'optD' in to_load:
@@ -93,47 +77,51 @@ def main(args):
         if 'optG' in to_load:
             optG.load_state_dict(to_load['optG'])
 
-    print(discrim)
+    status('Loading data from %s' % args.data)
+    dataset = load_data(video_dir=args.data, anno=args.anno, vocab=vocab, batch_size=args.batch_size, val=False, num_workers=args.workers, num_channels=args.num_channels, random_frames=args.random_frames, frame_size=args.frame_size)
+
     print(gen)
     print(txt_encoder)
+    for filepath, name, discrim in zip(args.D, gan.discrim_names, gan.discrims):
+        print("%s (%s)" % (filepath, name))
+        print(discrim)
 
     print("Vocab Size %d" % len(vocab))
     print("Dataset len= %d (%d batches)" % (len(dataset)*args.batch_size, len(dataset)))
 
-    params = TrainParams().read_from(args)
-    print(device)
-    # TODO: load loss dynamically
-    losses = WassersteinGanLoss()
-    gan_train(gan=gan, num_epoch=args.epoch, dataset=dataset, device=device, optD=optD, optG=optG, params=params, losses=losses)
+    if args.G_loss is None:
+        args.G_loss = args.D_loss
 
+    losses = MixedGanLoss(g_loss=create_object(args.G_loss), d_loss=create_object(args.D_loss))
+
+    train(gan=gan, num_epoch=args.epochs, dataset=dataset, device=device, optD=optD, optG=optG, params=args, losses=losses, vocab=vocab, channel_first=not args.sequence_first, end2end=args.end2end)
 
 if __name__ == '__main__':
-    # TODO: args
     parser = argparse.ArgumentParser()
+    add_params_to_parser(parser)
+
     # General setup stuff
     parser.add_argument('--seed', type=int, default=None, help='Seed to use')
     parser.add_argument('--cuda', action='store_true', help='enables cuda')
     parser.add_argument('--workers', type=int, default=2, help='number of workers to help with loading/pre-processing data')
-    #parser.add_argument('--ngpu', type=int, default=1, help='number of GPUs to use')
-
-    parser.add_argument('--out', type=str, default='out', help='dir output path')
-    parser.add_argument('--out_samples', type=str, default='out_samples', help='dir output path')
-
-    parser.add_argument('--frame_size', type=int, default=64, help='frame size')
+    parser.add_argument('--ngpu', type=int, default=1, help='number of GPUs to use')
+    
+    # input
+    parser.add_argument('--frame_size', type=int, nargs='+', default=[64], help='frame size')
     parser.add_argument('--num_channels', type=int, default=1, help='number of channels in input')
     parser.add_argument('--random_frames', type=int, default=0, help='use random frames')
 
     # Training params
-    parser.add_argument('--epoch', type=int, default=5, help='number of epochs to perform')
+    parser.add_argument('--epochs', type=int, default=5, help='number of epochs to perform')
     parser.add_argument('--batch_size', type=int, default=64, help='input batch size')
     parser.add_argument('--init_method', type=str, default='xavier', help='method for initialisation')
 
-    parser.add_argument('--gen_steps', type=int, default=1, help='Number of generator steps to use per iteration')
+    parser.add_argument('--G_loss', type=str, default=None, help='class for loss for G (default is None => same as D)')
     parser.add_argument('--G_lr', type=float, default=0.0001, help='learning rate for G')
     parser.add_argument('--G_beta1', type=float, default=0.5, help='beta1 for adam for G')
     parser.add_argument('--G_beta2', type=float, default=0.9, help='beta1 for adam for G')
 
-    parser.add_argument('--discrim_steps', type=int, default=2, help='Number of discriminator steps to use per iteration')
+    parser.add_argument('--D_loss', type=str, default='txt2vid.gan.losses.WassersteinGanLoss', help='class for loss for D (class-name or JSON file)')
     parser.add_argument('--D_lr', type=float, default=0.0001, help='learning rate for D')
     parser.add_argument('--D_beta1', type=float, default=0.5, help='beta1 for adam for D')
     parser.add_argument('--D_beta2', type=float, default=0.9, help='beta1 for adam for D')
@@ -146,9 +134,15 @@ if __name__ == '__main__':
     parser.add_argument('--vocab', type=str, help='vocab location', required=True)
 
     # Model specific
+    parser.add_argument('--M', type=str, default=None, help='mapping for x')
     parser.add_argument('--G', type=str, default=None, help='G model', required=True)
     parser.add_argument('--D', type=str, default=None, nargs='+', help='D model(s)', required=True)
+    parser.add_argument('--D_names', type=str, default=None, nargs='+', help='D model names')
     parser.add_argument('--sent', type=str, default=None, help='Sentence model')
+    parser.add_argument('--sent_init_method', type=str, default=None, help='Sentence model init, by default will do the same as regular init_method')
+
+    parser.add_argument('--end2end', action='store_true', default=False, help='trains the model end2end, i.e. the sentence (cond) model is not frozen')
+    parser.add_argument('--sequence_first', action='store_true', default=False, help='puts sequence first before channels in input to models')
 
     args = parser.parse_args()
     main(args)

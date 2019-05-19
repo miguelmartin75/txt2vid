@@ -1,5 +1,8 @@
+import torch
+import torch.nn as nn
+
 class SentenceEncoder(nn.Module):
-    def __init__(self, vocab_size=None, embed_size=128, hidden_size=256, encoding_size=256, num_layers=2):
+    def __init__(self, vocab_size=None, embed_size=256, hidden_size=256, encoding_size=256, num_layers=2):
         super().__init__()
 
         self.hidden_size = hidden_size
@@ -12,8 +15,6 @@ class SentenceEncoder(nn.Module):
 
         #self.to_vec = nn.Linear(hidden_size, encoding_size)
         self.to_vocab = nn.Linear(hidden_size, vocab_size)
-
-        self.apply(weights_init)
 
     def forward(self, x, lengths=None, initial_state=None, raw_output=True):
         max_len = lengths[0]

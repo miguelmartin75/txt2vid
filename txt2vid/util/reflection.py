@@ -1,4 +1,4 @@
-import torch
+from pathlib import Path
 
 # https://stackoverflow.com/questions/452969/does-python-have-an-equivalent-to-java-class-forname
 def get_class(kls):
@@ -9,16 +9,28 @@ def get_class(kls):
         m = getattr(m, comp)            
     return m
 
-def create_object(json_obj, **kwargs):
+def create_object(json_or_file, **kwargs):
+    if isinstance(json_or_file, str):
+        if Path(json_or_file).exists():
+            return create_object_file(json_or_file, **kwargs)
+        else:
+            json_obj = { 'class': json_or_file }
+            return create_object_json(json_obj, **kwargs)
+    else:
+        assert(isinstance(json_or_file, dict))
+        return create_object_json(json_or_file, **kwargs)
+
+
+def create_object_json(json_obj, **kwargs):
     params = json_obj
     clz = get_class(params['class'])
 
+    args = {}
     if 'args' in params:
         args = params['args']
-        args.update(kwargs)
-        return clz(**args)
 
-    return clz()
+    args.update(kwargs)
+    return clz(**args)
 
 # creates an object from a json file
 # assumes json is of the form:

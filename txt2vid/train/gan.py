@@ -55,7 +55,7 @@ def main(args):
         sample_mapping = create_object(args.M).to(device)
         init(sample_mapping, init_method=args.init_method)
 
-    gan = CondGan(gen=gen, discrims=discrims, cond_encoder=txt_encoder, sample_mapping=sample_mapping, discrim_names=args.D_names)
+    gan = CondGan(gen=gen, discrims=discrims, cond_encoder=txt_encoder, sample_mapping=sample_mapping, discrim_names=args.D_names, discrim_lambdas=args.D_lambdas)
 
     D_params = [ { "params": p } for p in gan.discrims_params ]
     G_params = [ { "params": gen.parameters() } ]
@@ -138,11 +138,13 @@ if __name__ == '__main__':
     parser.add_argument('--G', type=str, default=None, help='G model', required=True)
     parser.add_argument('--D', type=str, default=None, nargs='+', help='D model(s)', required=True)
     parser.add_argument('--D_names', type=str, default=None, nargs='+', help='D model names')
+    parser.add_argument('--D_lambdas', type=float, default=None, nargs='+', help='associated lambdas for each discriminator (used for weighted sum in loss); if None will assume each are associated with an equal weight, i.e. equivalent to a .mean()')
     parser.add_argument('--sent', type=str, default=None, help='Sentence model')
     parser.add_argument('--sent_init_method', type=str, default=None, help='Sentence model init, by default will do the same as regular init_method')
 
     parser.add_argument('--end2end', action='store_true', default=False, help='trains the model end2end, i.e. the sentence (cond) model is not frozen')
     parser.add_argument('--sequence_first', action='store_true', default=False, help='puts sequence first before channels in input to models')
+    parser.add_argument('--debug', action='store_true', default=False, help='debug logging')
 
     args = parser.parse_args()
     main(args)

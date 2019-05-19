@@ -3,7 +3,7 @@ import torch
 from txt2vid.util.misc import gen_perm
 
 class CondGan(object):
-    def __init__(self, gen=None, discrims=None, cond_encoder=None, discrim_names=None, sample_mapping=None):
+    def __init__(self, gen=None, discrims=None, cond_encoder=None, discrim_names=None, sample_mapping=None, discrim_lambdas=None):
         assert(gen is not None)
         assert(discrims is not None)
         assert(len(discrims) >= 1)
@@ -16,6 +16,17 @@ class CondGan(object):
         self.sample_mapping = sample_mapping
         self.cond_encoder = cond_encoder
         self.discrim_names = discrim_names
+        self.discrim_lambdas = discrim_lambdas
+
+    def _map_input(self, x):
+        return self.sample_mapping(x) if self.sample_mapping is not None and x is not None else None
+    
+    def _discrim_weighted_sum(self, losses):
+        if self.discrim_lambdas is None:
+            return torch.mean(losses)
+
+        lambdas = torch.tensor(self.discrim_lambdas, device=losses.device)
+        return torch.sum(lambdas * losses)
 
     # override me
     def discrim_forward(self, name=None, discrim=None, real=None, real_mapping=None, fake=None, fake_mapping=None, real_cond=None, fake_cond=None, loss=None):
@@ -49,34 +60,30 @@ class CondGan(object):
 
         return l, fake_pred, real_pred
 
+
     def gen_step(self, fake=None, real_pred=None, cond=None, loss=None):
         self.gen.zero_grad()
 
         if self.cond_encoder is not None:
             self.cond_encoder.zero_grad()
 
-        fake_mapping = self.map_input(fake.detach())
+        fake_mapping = self._map_input(fake.detach())
 
         losses = []
         for r, name, discrim in zip(real_pred, self.discrim_names, self.discrims):
             f = discrim(x=fake, cond=cond, xbar=fake_mapping)
             losses.append(loss(fake=f, real=None))
-            #losses.append(loss(fake=f, real=r))
-            break
 
-        losses = torch.stack(losses)
-        return losses.mean()
+        return self._discrim_weighted_sum(torch.stack(losses))
     
-    def map_input(self, x):
-        return self.sample_mapping(x) if self.sample_mapping is not None and x is not None else None
 
     def all_discrim_forward(self, fake=None, real=None, cond=None, loss=None):
         losses = []
         real_pred = []
         fake_pred = []
 
-        real_mapping = self.map_input(real)
-        fake_mapping = self.map_input(fake)
+        real_mapping = self._map_input(real)
+        fake_mapping = self._map_input(fake)
 
         for name, discrim in zip(self.discrim_names, self.discrims):
             real_cond = cond
@@ -108,7 +115,7 @@ class CondGan(object):
             self.cond_encoder.zero_grad()
 
         losses, _, _ = self.all_discrim_forward(real=real, fake=fake, cond=cond, loss=loss)
-        return torch.mean(torch.stack(losses))
+        return self._discrim_weighted_sum(torch.stack(losses))
 
     def __call__(self, *args, **kwargs):
         return self.gen(*args, **kwargs)

@@ -29,9 +29,10 @@ def add_params_to_parser(parser):
 
 # TODO: generalise
 def train(gan=None, num_epoch=None, dataset=None, device=None, optD=None, optG=None, params=None, vocab=None, losses=None, channel_first=True, end2end=True):
-    status("Parameter settings:")
-    print(locals())
-    print()
+    if params.debug:
+        status("Parameter settings:")
+        print(locals())
+        print()
 
     ensure_exists(params.out)
     ensure_exists(params.out_samples)

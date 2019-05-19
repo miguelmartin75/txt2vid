@@ -63,7 +63,7 @@ class SentenceEncoder(nn.Module):
 
     def create_initial_state(self):
         # TODO
-        hidden = Variable(torch.zeros(self.n_layers, 1, self.hidden_size))
+        hidden = torch.Variable(torch.zeros(self.n_layers, 1, self.hidden_size))
         return hidden
 
 if __name__ == '__main__':

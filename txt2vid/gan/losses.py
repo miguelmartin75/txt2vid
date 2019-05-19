@@ -1,3 +1,6 @@
+import torch
+import torch.nn as nn
+
 class LabelledGanLoss(object):
 
     def __init__(self, real_label=None, fake_label=None, underlying_loss=None):
@@ -18,7 +21,7 @@ class LabelledGanLoss(object):
         return fake + real
 
     def gen_loss(self, fake=None, real=None):
-        return self._compute_loss(fake, self.REAL_EXAMPLE)
+        return self._compute_loss(fake, self.real_label)
 
 class VanillaGanLoss(LabelledGanLoss):
 
@@ -30,7 +33,7 @@ class HingeGanLoss(LabelledGanLoss):
 
     def __init__(self, margin=2.0):
         self.loss = nn.HingeEmbeddingLoss(margin=margin)
-        super().__init__(underlying_loss=loss, real_label=1, fake_label=-1)
+        super().__init__(underlying_loss=self.loss, real_label=1, fake_label=-1)
 
 class WassersteinGanLoss(object):
 

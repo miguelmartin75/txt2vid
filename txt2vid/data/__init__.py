@@ -104,7 +104,7 @@ class Dataset(data.Dataset):
             frames = new_frames
         else:
             if len(frames) < self.random_frames:
-                print('Video %s with %d frames' % (video_path, len(frames)))
+                print('Video %s with %d frames' % (self.get_video_path(vid), len(frames)))
 
             assert(len(frames) >= self.random_frames)
 

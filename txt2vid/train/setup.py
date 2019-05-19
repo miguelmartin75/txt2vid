@@ -2,6 +2,8 @@ import numpy as np
 import random
 import torch
 
+from txt2vid.util.log import warn, status
+
 def set_seed(seed):
     if seed is None:
         seed = random.randint(1, 100000)
@@ -22,8 +24,6 @@ def set_cuda(use_cuda=False):
     return torch.device("cuda:0" if use_cuda else "cpu")
 
 def setup(args):
-    from txt2vid.util.log import status
-
     seed = set_seed(args.seed)
     device = set_cuda(use_cuda=args.cuda)
     status('Seed: %d' % seed)

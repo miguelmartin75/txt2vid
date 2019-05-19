@@ -17,7 +17,7 @@ TRAIN_SPLIT_RATIO=0.8
 train_dir = path / 'train'
 val_dir = path / 'val'
 
-from util.dir import ensure_exists
+from txt2vid.util.dir import ensure_exists
 ensure_exists(train_dir)
 ensure_exists(val_dir)
 

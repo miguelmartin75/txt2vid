@@ -10,7 +10,8 @@ VIDEO_DIR=${VIDEO_DIR:-$BASE_DIR}
 ANNO=${ANNO:-./msr/msr.pickle}
 VOCAB=${VOCAB:-./msr/msr.vocab}
 OUT_DIR=${OUT_DIR:-/run/media/doubleu/Linux/honours/temp/${OUT_NAME}}
-EXAMPLE_DIR=${EXAMPLE_DIR:-/run/media/doubleu/Linux/honours/temp/${OUT_NAME}_samples_2}
+EXAMPLE_DIR=${EXAMPLE_DIR:-/run/media/doubleu/Linux/honours/temp/${OUT_NAME}_samples_old}
 
-#echo python3 txt2vid/train.py --data $VIDEO_DIR --anno $ANNO --workers 8 --batch_size 64 --epoch 100 --use_normal_init ${USE_NORMAL} --recon_lambda $RECON_LOSS --out $OUT_DIR --out_samples $EXAMPLE_DIR --beta1 0.5 --lr 0.0002 --sent_encode_path $FASTDIR/sent.pth --num_channels 3 --vocab $VOCAB --cuda
-python3 txt2vid/train.py --data $VIDEO_DIR --anno $ANNO --workers 8 --batch_size 64 --epoch 100 --use_normal_init ${USE_NORMAL} --recon_lambda $RECON_LOSS --out $OUT_DIR --out_samples $EXAMPLE_DIR --beta1 0.1 --beta2 0.9 --lr 0.0001 --sent_encode_path msr/sent.pth --num_channels 3 --vocab $VOCAB --cuda
+# TODO: change G and D to be json files
+#python3 txt2vid/train/gan.py --data $VIDEO_DIR --anno $ANNO --workers 8 --batch_size 32 --epochs 100 --out $OUT_DIR --out_samples $EXAMPLE_DIR --num_channels 3 --vocab $VOCAB --cuda --G txt2vid.models.tgan.gen.Gen --D txt2vid.models.tgan.discrim.Discrim --sent txt2vid.models.txt.basic.SentenceEncoder --end2end
+python3 txt2vid/train/gan.py --data $VIDEO_DIR --anno $ANNO --workers 8 --batch_size 32 --epochs 100 --out $OUT_DIR --out_samples $EXAMPLE_DIR --num_channels 3 --vocab $VOCAB --cuda --G txt2vid.models.tcwyt.gen.Gen --D txt2vid.models.tcwyt.video_discrim.VideoDiscrim txt2vid.models.tcwyt.frame_discrim.FrameDiscrim txt2vid.models.tcwyt.motion_discrim.MotionDiscrim --sent txt2vid.models.txt.basic.SentenceEncoder --frame_size 48 --M txt2vid.models.tcwyt.frame_discrim.FrameMap --D_names video frame motion --D_lambdas 0.3 0.5 0.5 #--end2end

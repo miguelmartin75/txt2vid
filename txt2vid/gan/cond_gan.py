@@ -140,8 +140,8 @@ class CondGan(object):
         self.gen.load_state_dict(to_load['gen'])
 
         if 'cond' in to_load:
-            assert(self.cond is not None)
-            self.cond.load_state_dict(to_load['cond'])
+            assert(self.cond_encoder is not None)
+            self.cond_encoder.load_state_dict(to_load['cond'])
 
         if 'sample_mapping' in to_load:
             assert(self.sample_mapping is not None)

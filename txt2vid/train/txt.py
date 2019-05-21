@@ -7,13 +7,16 @@ import torch.nn as nn
 import torch.optim as optim
 import torch.backends.cudnn as cudnn
 
-from txt2vid.model import SentenceEncoder
 from txt2vid.data import Vocab
-from util.pickle import load
-from util.log import status, warn, error
+from txt2vid.util.reflection import create_object
+from txt2vid.util.pick import load
+from txt2vid.util.log import status, warn, error
+from txt2vid.util.dir import ensure_exists
+from txt2vid.util.metrics import RollingAvgLoss
+from txt2vid.train.setup import setup
+from txt2vid.models.txt.basic import Seq2Seq
 
 from tensorboardX import SummaryWriter
-
 
 class SentenceDataset(torch.utils.data.Dataset):
 
@@ -59,13 +62,13 @@ def eval(split, seq2seq, device, vocab, debug=False):
 
             sent = sent.to(device)
 
-            _, hs, _ = seq2seq(sent, lengths=lengths)
+            _, hs, _ = seq2seq.encode(sent, lengths=lengths)
 
-            decoded, d_symbols = seq2seq.sample(true_inputs=sent, initial_hidden=hs, max_seq_len=lengths[0], teacher_force=False)
+            decoded, d_symbols = seq2seq.decode(true_inputs=sent, initial_hidden=hs, max_seq_len=lengths[0], teacher_force=False)
 
             from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
             packed = pack_padded_sequence(sent, lengths, batch_first=True)
-            targets , _ = pad_packed_sequence(packed, batch_first=True, total_length=lengths[0])
+            targets, _ = pad_packed_sequence(packed, batch_first=True, total_length=lengths[0])
 
             predicted_words = vocab.to_words(d_symbols[-1])
             if debug:
@@ -84,30 +87,16 @@ def eval(split, seq2seq, device, vocab, debug=False):
     return loss / num_examples
 
 def main(args):
-    if args.seed is None:
-        args.seed = random.randint(1, 100000)
-    status('Seed: %d' % args.seed)
-
-    random.seed(args.seed)
-    torch.manual_seed(args.seed)
-
-    cudnn.benchmark = True
-
-    if torch.cuda.is_available() and not args.cuda:
-        warn('cuda is available, you probably want to use --cuda')
-
-    device = torch.device("cuda:0" if args.cuda else "cpu")
-
-    from util.dir import ensure_exists
+    seed, device = setup(args)
     ensure_exists(args.out)
 
     vocab = load(args.vocab)
-    seq2seq = SentenceEncoder(vocab_size=len(vocab), num_layers=4).to(device)
+    seq2seq = Seq2Seq(vocab_size=len(vocab), separate_decoder=args.separate_decoder).to(device)
     optimizer = optim.Adam(seq2seq.parameters(), lr=args.lr, betas=(args.beta1, args.beta2))
 
-    if args.model:
+    if args.weights:
         status("Loading model")
-        temp = torch.load(args.model)
+        temp = torch.load(args.weights)
         if 'txt' in temp:
             seq2seq = temp['txt']
         if 'optim' in temp:
@@ -117,7 +106,7 @@ def main(args):
     val = []
     test = []
 
-    data = SentenceDataset(vocab=vocab, sent_path=args.sents)
+    data = SentenceDataset(vocab=vocab, sent_path=args.data)
 
     random.shuffle(data.sents)
     for i in range(len(data.sents)):
@@ -149,32 +138,32 @@ def main(args):
         print("Test loss = %.4f" % loss_val)
         sys.exit(0)
 
-    from txt2vid.metrics import RollingAvgLoss
-    rolling_loss = RollingAvgLoss(window_size=10)
+    log_window_period = 50
+    save_model_period = 500
+
+    rolling_loss = RollingAvgLoss(window_size=log_window_period)
 
     criteria = nn.CrossEntropyLoss()
-
     writer = SummaryWriter()
 
     print("Teacher force prob = %.4f" % (args.teacher_force))
 
     iteration = 0
     val_loss = -1
+
     for epoch in range(args.epoch):
         for i, (sent, lengths) in enumerate(train_dataset):
-            batch_size = sent.size(0)
-
             sent = sent.to(device)
 
             seq2seq.zero_grad()
-            _, hidden_states, _ = seq2seq(sent, lengths=lengths)
+            _, hidden_states, _ = seq2seq.encode(sent, lengths=lengths)
 
             from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
             packed = pack_padded_sequence(sent, lengths, batch_first=True)
             targets, _ = pad_packed_sequence(packed, batch_first=True, total_length=lengths[0])
 
             teacher_force = random.uniform(0, 1) <= args.teacher_force
-            decoded, d_symbols = seq2seq.sample(true_inputs=sent, initial_hidden=hidden_states, max_seq_len=lengths[0], teacher_force=teacher_force)
+            decoded, d_symbols = seq2seq.decode(true_inputs=sent, initial_hidden=hidden_states, max_seq_len=lengths[0], teacher_force=teacher_force)
 
             loss = criteria(decoded.permute(0, 2, 1), targets)
 
@@ -187,8 +176,8 @@ def main(args):
 
             iteration += 1
 
-            if iteration % 500 == 0:
-                # TODO: fix eval
+            if iteration % save_model_period == 0:
+                # TODO: fix eval ??????
                 val_loss = eval(val_dataset, seq2seq, device, vocab)#, criteria)
                 writer.add_scalar('data/val_loss', val_loss, iteration)
 
@@ -197,7 +186,7 @@ def main(args):
                 to_save = { 'optim': optimizer, 'txt': seq2seq }
                 torch.save(to_save, where_to_save)
 
-            if iteration % 50 == 0:
+            if iteration % log_window_period == 0:
                 #_, predicted = decoded.max(1)
                 #print(decoded)
                 predicted_words = vocab.to_words(d_symbols[0])
@@ -214,28 +203,29 @@ def main(args):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--sents', type=str, default=None, help='Input sentences', required=True)
-    parser.add_argument('--vocab', type=str, default=None, help='vocab', required=True)
-    parser.add_argument('--out', type=str, default=None, help='output path', required=True)
+    parser.add_argument('--data', type=str, default=None, help='Input sequence data', required=True)
+    parser.add_argument('--vocab', type=str, default=None, help='Vocab data for input sequences', required=True)
     
-    parser.add_argument('--model', type=str, default=None, help='model path')
-    parser.add_argument('--test', type=int, default=0, help='to test or not to test')
+    parser.add_argument('--weights', type=str, default=None, help='model path')
+    parser.add_argument('--test', action='store_true', default=False, help='to test or not to test')
+    parser.add_argument('--separate_decoder', action='store_true', default=False, help='use seperate weights for decoder')
 
     parser.add_argument('--epoch', type=int, default=5, help='number of epochs to perform')
 
     parser.add_argument('--batch_size', type=int, default=64, help='input batch size')
-    parser.add_argument('--lr', type=float, default=0.0002, help='learning rate')
+    parser.add_argument('--lr', type=float, default=0.001, help='learning rate')
     parser.add_argument('--beta1', type=float, default=0.9, help='beta1 for adam. default=0.5')
     parser.add_argument('--beta2', type=float, default=0.999, help='beta1 for adam. default=0.5')
 
     parser.add_argument('--seed', type=int, default=None, help='seed')
     parser.add_argument('--cuda', action='store_true', help='enables cuda')
-    parser.add_argument('--ngpu', type=int, default=1, help='number of GPUs to use')
     parser.add_argument('--workers', type=int, default=2, help='number of workers to help with loading/pre-processing data')
 
     parser.add_argument('--teacher_force', type=float, default=0.5, help='teacher force ratio')
 
     parser.add_argument('--max_seq_len', type=int, default=10, help='max sequence length')
+
+    parser.add_argument('--out', type=str, default=None, help='output path for learnt models', required=True)
 
     args = parser.parse_args()
     main(args)

@@ -12,7 +12,7 @@ class LabelledGanLoss(object):
         self.real_label = fake_label
 
     def _compute_loss(self, x, label):
-        labels = torch.full(x.size(0), label, device=x.device)
+        labels = torch.full(x.size(), label, device=x.device)
         return self.loss(x, labels)
 
     def discrim_loss(self, fake=None, real=None):
@@ -27,7 +27,7 @@ class VanillaGanLoss(LabelledGanLoss):
 
     def __init__(self, bce_loss=True):
         loss = nn.BCEWithLogitsLoss() if bce_loss else nn.CrossEntropyLoss()
-        super().__init__(underlying_loss=loss, real_label=1, fake_label=1)
+        super().__init__(underlying_loss=loss, real_label=1, fake_label=0)
 
 class HingeGanLoss(LabelledGanLoss):
 

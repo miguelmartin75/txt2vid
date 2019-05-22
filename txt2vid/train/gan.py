@@ -33,7 +33,6 @@ def main(args):
         txt_encoder = torch.load(args.sent_weights)
         if 'txt' in txt_encoder:
             txt_encoder = txt_encoder['txt'].to(device)
-        status("Sentence encode size = %d" % txt_encoder.encoding_size)
     else:
         status("Using random init sentence encoder")
         txt_encoder = create_object(args.sent, vocab_size=len(vocab)).to(device)
@@ -41,7 +40,8 @@ def main(args):
             args.sent_init_method = args.init_method
         init(txt_encoder, init_method=args.sent_init_method)
 
-    cond_dim = txt_encoder.encoding_size
+    cond_dim = txt_encoder.encoder.encoding_size
+    status("Sentence encode size = %d" % cond_dim)
 
     gen = create_object(args.G, cond_dim=cond_dim).to(device)
     discrims = [ create_object(d).to(device) for d in args.D ]
@@ -65,8 +65,14 @@ def main(args):
         D_params.append({"params": txt_encoder.parameters()})
         G_params.append({"params": txt_encoder.parameters()})
 
-    optD = optim.Adam(D_params, lr=args.D_lr, betas=(args.D_beta1, args.D_beta2))
-    optG = optim.Adam(G_params, lr=args.G_lr, betas=(args.G_beta1, args.G_beta2))
+    if args.sgd:
+        status("Using SGD")
+        optD = optim.SGD(D_params, lr=args.D_lr, momentum=args.D_beta1)
+        optG = optim.SGD(G_params, lr=args.G_lr, momentum=args.G_beta1)
+    else:
+        status("Using Adam")
+        optD = optim.Adam(D_params, lr=args.D_lr, betas=(args.D_beta1, args.D_beta2))
+        optG = optim.Adam(G_params, lr=args.G_lr, betas=(args.G_beta1, args.G_beta2))
 
     if args.weights is not None:
         to_load = torch.load(args.weights)
@@ -80,6 +86,8 @@ def main(args):
     status('Loading data from %s' % args.data)
     dataset = load_data(video_dir=args.data, anno=args.anno, vocab=vocab, batch_size=args.batch_size, val=False, num_workers=args.workers, num_channels=args.num_channels, random_frames=args.random_frames, frame_size=args.frame_size)
 
+    print('D optim=', optD)
+    print('G optim=', optG)
     print(gen)
     print(txt_encoder)
     for filepath, name, discrim in zip(args.D, gan.discrim_names, gan.discrims):
@@ -121,7 +129,7 @@ if __name__ == '__main__':
     parser.add_argument('--G_beta1', type=float, default=0.5, help='beta1 for adam for G')
     parser.add_argument('--G_beta2', type=float, default=0.9, help='beta1 for adam for G')
 
-    parser.add_argument('--D_loss', type=str, default='txt2vid.gan.losses.WassersteinGanLoss', help='class for loss for D (class-name or JSON file)')
+    parser.add_argument('--D_loss', type=str, default='txt2vid.gan.losses.VanillaGanLoss', help='class for loss for D (class-name or JSON file)')
     parser.add_argument('--D_lr', type=float, default=0.0001, help='learning rate for D')
     parser.add_argument('--D_beta1', type=float, default=0.5, help='beta1 for adam for D')
     parser.add_argument('--D_beta2', type=float, default=0.9, help='beta1 for adam for D')
@@ -143,6 +151,7 @@ if __name__ == '__main__':
     parser.add_argument('--sent_init_method', type=str, default=None, help='Sentence model init, by default will do the same as regular init_method')
 
     parser.add_argument('--end2end', action='store_true', default=False, help='trains the model end2end, i.e. the sentence (cond) model is not frozen')
+    parser.add_argument('--sgd', action='store_true', default=False, help='use SGD with momentum instead of adam (uses beta1)')
     parser.add_argument('--sequence_first', action='store_true', default=False, help='puts sequence first before channels in input to models')
     parser.add_argument('--debug', action='store_true', default=False, help='debug logging')
 

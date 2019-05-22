@@ -54,9 +54,8 @@ class CondGan(object):
                 fake_pred = discrim(x=fake, cond=None, xbar=fake_mapping)
 
         l = None
-        if fake_pred is not None and real_pred is not None:
-            if loss is not None:
-                l = loss(fake=fake_pred, real=real_pred)
+        if loss is not None and fake_pred is not None and real_pred is not None:
+            l = loss(fake=fake_pred, real=real_pred)
 
         return l, fake_pred, real_pred
 
@@ -72,7 +71,7 @@ class CondGan(object):
         losses = []
         for r, name, discrim in zip(real_pred, self.discrim_names, self.discrims):
             f = discrim(x=fake, cond=cond, xbar=fake_mapping)
-            losses.append(loss(fake=f, real=None))
+            losses.append(loss(fake=f, real=r))
 
         return self._discrim_weighted_sum(torch.stack(losses))
     

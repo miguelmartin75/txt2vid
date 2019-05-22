@@ -63,7 +63,7 @@ def train(gan=None, num_epoch=None, dataset=None, device=None, optD=None, optG=N
 
             cond = None
             if gan.cond_encoder is not None:
-                _, _, cond = gan.cond_encoder(captions, lengths)
+                _, _, cond = gan.cond_encoder.encode(captions, lengths)
                 if not end2end:
                     cond = cond.detach()
 
@@ -109,7 +109,7 @@ def train(gan=None, num_epoch=None, dataset=None, device=None, optD=None, optG=N
 
                 total_g_loss += float(loss)
                 # TODO: normalisation step for gen
-                
+
             gen_loss.update(float(total_g_loss))
 
             if (iteration == 1 and params.save_initial) or iteration % params.save_example_period == 0:

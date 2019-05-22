@@ -50,13 +50,16 @@ class Gen(nn.Module):
 
 if __name__ == '__main__':
     # The number of frames in a video is fixed at 16
-    batch_size = 8 
+    batch_size = 64
     num_channels = 3
     z_size = 100
     cond_size = 256
 
-    gen = Gen(z_size=z_size, num_channels=3, scale_factor=1, cond_dim=cond_size)
+    gen = Gen(z_size=z_size, num_channels=3, scale_factor=1.5, cond_dim=cond_size)
     z = torch.randn(batch_size, z_size)
     cond = torch.randn(batch_size, cond_size)
     out = gen(z, cond=cond)
     print("Output video generator:", out.size())
+
+    from txt2vid.util.misc import count_params
+    print("Num params = %d" % count_params(gen))

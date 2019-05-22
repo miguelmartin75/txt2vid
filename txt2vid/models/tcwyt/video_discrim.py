@@ -67,6 +67,20 @@ class VideoDiscrim(nn.Module):
         return pred
 
 if __name__ == '__main__':
-    # TODO
-    print("TODO")
-    #discrim = Discrim()
+    batch_size = 64
+    num_channels = 3
+    cond_size = 256
+    frame_size = 48
+    num_frames = 16
+
+    vid = torch.randn(batch_size, num_channels, num_frames, frame_size, frame_size)
+    cond = torch.randn(batch_size, cond_size)
+
+    discrim = VideoDiscrim()
+    out = discrim(x=vid, cond=cond)
+
+    print("Output video discrim:", out.size())
+
+    from txt2vid.util.misc import count_params
+    print("Num params = %d" % count_params(discrim))
+

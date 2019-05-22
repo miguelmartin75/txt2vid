@@ -6,7 +6,7 @@ from torch.autograd import Variable
 class Discrim(nn.Module):
     def __init__(self, sequence_first=True, in_channels=3, mid_ch=64):
         super().__init__()
-        self.sequence_first=True
+        self.sequence_first=sequence_first
 
         self.c0 = nn.Conv3d(in_channels, mid_ch, 4, 2, 1)
         self.c1 = nn.Conv3d(mid_ch, mid_ch * 2, 4, 2, 1)
@@ -29,7 +29,10 @@ class Discrim(nn.Module):
         return torch.mean(h, 1)
    
 if __name__ == "__main__":
-    x = Variable(torch.randn(8, 3, 16, 64, 64))
-    discr = Discrim()
+    x = Variable(torch.randn(64, 3, 16, 64, 64))
+    discr = Discrim(sequence_first=False)
     out = discr(x)
-    print(out)
+    print(out.size())
+
+    from txt2vid.util.misc import count_params
+    print("Num params = %d" % count_params(discr))

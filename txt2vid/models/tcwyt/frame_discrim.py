@@ -19,8 +19,8 @@ class FrameMap(nn.Module):
             nn.LeakyReLU(0.2, True),
 
             nn.Conv2d(256, 512, 4, 2, 1, bias=False),
-            nn.BatchNorm2d(512),
-            nn.LeakyReLU(0.2, True),
+            #nn.BatchNorm2d(512),
+            #nn.LeakyReLU(0.2, True),
         )
 
 
@@ -90,5 +90,27 @@ class FrameDiscrim(nn.Module):
         return torch.stack(outputs, 0).to(xbar.device)
 
 if __name__ == '__main__':
-    # TODO
-    print("TODO")
+    from txt2vid.util.misc import count_params
+
+    batch_size = 64
+    num_channels = 3
+    cond_size = 256
+    frame_size = 48
+    num_frames = 16
+
+    vid = torch.randn(batch_size, num_channels, num_frames, frame_size, frame_size)
+    cond = torch.randn(batch_size, cond_size)
+
+    frame_map = FrameMap()
+    frames = frame_map(vid)
+
+    print("output (frame_map) =", frames.size())
+    print("Num params (frame_map) = %d" % count_params(frame_map))
+
+    discrim = FrameDiscrim()
+    out = discrim(x=vid, cond=cond, xbar=frames)
+
+    print("Output frame discrim:", out.size())
+
+    print("Num params = %d" % count_params(discrim))
+

@@ -64,9 +64,9 @@ class Gen(nn.Module):
 
     def forward(self, z_slow, cond=None):
         # TODO
-        #if cond is not None:
-        #    z_slow_plus_cond = torch.cat((z_slow, cond), dim=1)
-        #    z_slow = self.cond_combine(z_slow_plus_cond)
+        if cond is not None:
+            z_slow_plus_cond = torch.cat((z_slow, cond), dim=1)
+            z_slow = self.cond_combine(z_slow_plus_cond)
 
         z_fast = self._fsgen(z_slow)
 
@@ -88,7 +88,10 @@ class Gen(nn.Module):
 if __name__ == "__main__":
     # The number of frames in a video is fixed at 16
     batch_size = 8
-    gen = Gen()
+    gen = Gen(z_slow_dim=356, cond_dim=256)
     z_slow = Variable(gen.generate_input(batch_size))
     out = gen(z_slow)
     print("Output video generator:", out.size())
+
+    from txt2vid.util.misc import count_params
+    print("Num params = %d" % count_params(gen))

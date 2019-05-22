@@ -6,3 +6,7 @@ def gen_perm(n):
     while (new_perm == old_perm).all():
         new_perm = np.random.permutation(old_perm)
     return new_perm
+
+def count_params(model):
+    return sum(p.numel() for p in model.parameters())
+

@@ -50,3 +50,30 @@ class MotionDiscrim(nn.Module):
             outputs.append(output)
 
         return torch.stack(outputs, 0).to(xbar.device)
+
+if __name__ == '__main__':
+    from txt2vid.util.misc import count_params
+    from txt2vid.models.tcwyt.frame_discrim import FrameMap
+
+    batch_size = 64
+    num_channels = 3
+    cond_size = 256
+    frame_size = 48
+    num_frames = 16
+
+    vid = torch.randn(batch_size, num_channels, num_frames, frame_size, frame_size)
+    cond = torch.randn(batch_size, cond_size)
+
+    frame_map = FrameMap()
+    frames = frame_map(vid)
+
+    print("output (frame_map) =", frames.size())
+    print("Num params (frame_map) = %d" % count_params(frame_map))
+
+    discrim = MotionDiscrim()
+    out = discrim(x=vid, cond=cond, xbar=frames)
+
+    print("Output frame discrim:", out.size())
+
+    print("Num params = %d" % count_params(discrim))
+

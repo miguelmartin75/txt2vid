@@ -12,7 +12,7 @@ def _weight_init(layer, init_func=None):
 
     elif 'BatchNorm' in name:
         if hasattr(layer, 'weight') and layer.weight is not None:
-            layer.weight.data.normal_(1.0, 0.02)
+            layer.weight.data.fill_(1.0)
 
         if hasattr(layer, 'bias') and layer.bias is not None:
             layer.bias.data.fill_(0.0)

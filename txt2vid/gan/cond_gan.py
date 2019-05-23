@@ -1,6 +1,7 @@
 import torch
 
 from txt2vid.util.misc import gen_perm
+from txt2vid.gan.losses import gradient_penalty
 
 class CondGan(object):
     def __init__(self, gen=None, discrims=None, cond_encoder=None, discrim_names=None, sample_mapping=None, discrim_lambdas=None):
@@ -29,7 +30,7 @@ class CondGan(object):
         return torch.sum(lambdas * losses)
 
     # override me
-    def discrim_forward(self, name=None, discrim=None, real=None, real_mapping=None, fake=None, fake_mapping=None, real_cond=None, fake_cond=None, loss=None):
+    def discrim_forward(self, name=None, discrim=None, real=None, real_mapping=None, fake=None, fake_mapping=None, real_cond=None, fake_cond=None, loss=None, gp_lambda=-1):
         fake_pred = None
         real_pred = None
 
@@ -56,7 +57,17 @@ class CondGan(object):
         l = None
         if loss is not None and fake_pred is not None and real_pred is not None:
             l = loss(fake=fake_pred, real=real_pred)
-
+            # TODO remove from here
+            if gp_lambda > 0:
+                gp = gradient_penalty(discrim, 
+                                      real_x=real, 
+                                      real_xbar=real_mapping,
+                                      fake_x=fake,
+                                      fake_xbar=fake_mapping,
+                                      real_cond=real_cond,
+                                      fake_cond=fake_cond)
+                l += gp_lambda * gp
+                
         return l, fake_pred, real_pred
 
 
@@ -76,7 +87,7 @@ class CondGan(object):
         return self._discrim_weighted_sum(torch.stack(losses))
     
 
-    def all_discrim_forward(self, fake=None, real=None, cond=None, loss=None):
+    def all_discrim_forward(self, fake=None, real=None, cond=None, loss=None, gp_lambda=-1):
         losses = []
         real_pred = []
         fake_pred = []
@@ -98,22 +109,23 @@ class CondGan(object):
                                            fake=fake, 
                                            real_mapping=real_mapping, 
                                            fake_mapping=fake_mapping, 
-                                           loss=loss)
-
+                                           loss=loss,
+                                           gp_lambda=gp_lambda)
+            
             losses.append(l)
             fake_pred.append(f)
             real_pred.append(r)
 
         return losses, fake_pred, real_pred
 
-    def discrim_step(self, real=None, fake=None, cond=None, loss=None):
+    def discrim_step(self, real=None, fake=None, cond=None, loss=None, gp_lambda=-1):
         for discrim in self.discrims:
             discrim.zero_grad()
 
         if self.cond_encoder is not None:
             self.cond_encoder.zero_grad()
 
-        losses, _, _ = self.all_discrim_forward(real=real, fake=fake, cond=cond, loss=loss)
+        losses, _, _ = self.all_discrim_forward(real=real, fake=fake, cond=cond, loss=loss, gp_lambda=gp_lambda)
         return self._discrim_weighted_sum(torch.stack(losses))
 
     def __call__(self, *args, **kwargs):

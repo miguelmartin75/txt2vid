@@ -114,3 +114,36 @@ class RaLSGANLoss(object):
         loss += torch.mean((fake - torch.mean(real) - y_real) ** 2)
         return loss / 2
 
+def gradient_penalty(discrim, real_x=None, real_xbar=None, fake_x=None, fake_xbar=None, real_cond=None, fake_cond=None):
+    assert(fake_x.size(0) == real_x.size(0))
+
+    batch_size = real_x.size(0)
+    alpha = torch.rand(batch_size)
+
+    alpha_x = alpha.expand_as(real_x).to(real_x.device)
+    interpolate_x = alpha_x * real_x + ((1 - alpha_x) * fake_x)
+    interpolate_x = torch.Variable(interpolate_x, requires_grad=True)
+
+    interpolate_xbar = None
+    if real_xbar is not None and fake_xbar is not None:
+        alpha_xbar = alpha.expand_as(real_xbar).to(real_xbar.device)
+        interpolate_xbar = alpha_xbar * real_xbar + ((1 - alpha_xbar) * fake_xbar)
+        interpolate_xbar = torch.Variable(interpolate_xbar, requires_grad=True)
+
+    interpolate_cond = None
+    if real_cond is not None and fake_cond is not None:
+        alpha_cond = alpha.expand_as(real_cond).to(real_cond.device)
+        interpolate_cond = alpha_cond * real_cond + ((1 - alpha_cond) * fake_cond)
+        interpolate_cond = torch.Variable(interpolate_cond, requires_grad=True)
+
+    inputs = [ interpolate_x ]
+    if interpolate_cond is not None:
+        inputs.append(interpolate_cond)
+    if interpolate_xbar is not None:
+        inputs.append(interpolate_xbar)
+
+    interpolates = discrim(x=interpolate_x, cond=interpolate_cond, xbar=interpolate_xbar)
+
+    from torch.autograd import grad
+    gradients = grad(outputs=interpolates, inputs=inputs, grad_outputs=torch.ones(interpolates.size(), device=interpolates.device), create_graph=True, retain_graph=True, only_inputs=True)[0]
+    return ((gradients.norm(2, dim=1) - 1) ** 2).mean()

@@ -16,6 +16,8 @@ def add_params_to_parser(parser):
     parser.add_argument('--discrim_steps', type=int, default=1, help='Number of discriminator steps to use per iteration')
     parser.add_argument('--gen_steps', type=int, default=1, help='Number of generator steps to use per iteration')
 
+    parser.add_argument('--gp_lambda', type=float, default=-1, help='GP lambda hyper-param (negative to disable GP)')
+
     # saving
     parser.add_argument('--save_initial', action='store_true', default=False, help='save initial model')
     parser.add_argument('--save_initial_examples', action='store_true', default=False, help='save initial sample')

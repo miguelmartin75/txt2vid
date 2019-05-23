@@ -97,18 +97,20 @@ class RaLSGANLoss(object):
         pass
 
     def discrim_loss(self, fake=None, real=None):
-        y = get_labels_for(fake, 1)
+        y_fake = get_labels_for(fake, 1)
+        y_real = get_labels_for(real, 1)
 
         loss = 0.0
-        loss += torch.mean((real - torch.mean(fake) - y) ** 2) 
-        loss += torch.mean((fake - torch.mean(real) + y) ** 2)
+        loss += torch.mean((real - torch.mean(fake) - y_real) ** 2) 
+        loss += torch.mean((fake - torch.mean(real) + y_fake) ** 2)
         return loss / 2
 
     def gen_loss(self, fake=None, real=None):
-        y = get_labels_for(fake, 1)
+        y_fake = get_labels_for(fake, 1)
+        y_real = get_labels_for(real, 1)
 
         loss = 0.0
-        loss += torch.mean((real - torch.mean(fake) + y) ** 2) 
-        loss += torch.mean((fake - torch.mean(real) - y) ** 2)
+        loss += torch.mean((real - torch.mean(fake) + y_fake) ** 2) 
+        loss += torch.mean((fake - torch.mean(real) - y_real) ** 2)
         return loss / 2
 

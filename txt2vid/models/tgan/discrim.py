@@ -6,8 +6,6 @@ from torch.autograd import Variable
 class Discrim(nn.Module):
     def __init__(self, sequence_first=True, in_channels=3, mid_ch=64):
         super().__init__()
-        self.sequence_first=sequence_first
-
         self.c0 = nn.Conv3d(in_channels, mid_ch, 4, 2, 1)
         self.c1 = nn.Conv3d(mid_ch, mid_ch * 2, 4, 2, 1)
         self.c2 = nn.Conv3d(mid_ch * 2, mid_ch * 4, 4, 2, 1)
@@ -18,9 +16,6 @@ class Discrim(nn.Module):
         self.bn3 = nn.BatchNorm3d(mid_ch * 8)
 
     def forward(self, x=None, cond=None, xbar=None):
-        if self.sequence_first:
-            x = x.permute(0, 2, 1, 3, 4)
-
         h = F.leaky_relu(self.c0(x))
         h = F.leaky_relu(self.bn1(self.c1(h)))
         h = F.leaky_relu(self.bn2(self.c2(h)))

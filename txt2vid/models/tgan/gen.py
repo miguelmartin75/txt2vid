@@ -50,23 +50,12 @@ class Gen(nn.Module):
         self.z_slow_dim = z_slow_dim
         self.z_fast_dim = z_fast_dim
         self.out_channels = out_channels
-        self._fsgen = FrameSeedGenerator(z_slow_dim, z_fast_dim)
-        self._vgen = VideoFrameGenerator(z_slow_dim, z_fast_dim, out_channels, bottom_width,conv_ch)
-
-        #self.cond_combine = nn.Linear(self.z_slow_plus_cond_dim, self.z_slow_dim)
-
-    def generate_input(self, batch_size=16):
-        """
-        Generates latent vector from normal distribution
-        """
-        z_slow = torch.randn(batch_size, self.z_slow_dim)
-        return z_slow
+        self._fsgen = FrameSeedGenerator(self.z_slow_plus_cond_dim, z_fast_dim)
+        self._vgen = VideoFrameGenerator(self.z_slow_plus_cond_dim, z_fast_dim, out_channels, bottom_width,conv_ch)
 
     def forward(self, z_slow, cond=None):
-        # TODO
         if cond is not None:
-            z_slow_plus_cond = torch.cat((z_slow, cond), dim=1)
-            z_slow = self.cond_combine(z_slow_plus_cond)
+            z_slow = torch.cat((z_slow, cond), dim=-1)
 
         z_fast = self._fsgen(z_slow)
 
@@ -79,7 +68,7 @@ class Gen(nn.Module):
 
         out = self._vgen(z_slow, z_fast)
         out = out.view(B, n_frames, self.out_channels, 64, 64)
-        return out
+        return out.permute(0, 2, 1, 3, 4)
 
     @property
     def latent_size(self):
@@ -87,10 +76,15 @@ class Gen(nn.Module):
 
 if __name__ == "__main__":
     # The number of frames in a video is fixed at 16
-    batch_size = 8
-    gen = Gen(z_slow_dim=356, cond_dim=256)
-    z_slow = Variable(gen.generate_input(batch_size))
-    out = gen(z_slow)
+    batch_size = 64
+    num_channels = 3
+    z_size = 100
+    cond_size = 256
+
+    gen = Gen(z_slow_dim=100, cond_dim=256)
+    z = torch.randn(batch_size, z_size)
+    cond = torch.randn(batch_size, cond_size)
+    out = gen(z, cond=cond)
     print("Output video generator:", out.size())
 
     from txt2vid.util.misc import count_params

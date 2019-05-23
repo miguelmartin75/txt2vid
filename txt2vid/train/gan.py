@@ -25,34 +25,50 @@ from txt2vid.gan.cond_gan import CondGan
 def main(args):
     seed, device = setup(args)
 
-    status('Loading vocab from %s' % args.vocab)
+    status("Loading vocab from %s" % args.vocab)
     vocab = load(args.vocab)
 
-    if args.sent_weights:
-        status("Loading pre-trained sentence model from %s" % args.sent_weights)
-        txt_encoder = torch.load(args.sent_weights)
-        if 'txt' in txt_encoder:
-            txt_encoder = txt_encoder['txt'].to(device)
-    else:
-        status("Using random init sentence encoder")
-        txt_encoder = create_object(args.sent, vocab_size=len(vocab)).to(device)
-        if args.sent_init_method is None:
-            args.sent_init_method = args.init_method
-        init(txt_encoder, init_method=args.sent_init_method)
+    txt_encoder = None
+    if not args.dont_use_sent:
+        if args.sent_weights:
+            status("Loading pre-trained sentence model from %s" % args.sent_weights)
+            txt_encoder = torch.load(args.sent_weights)
+            if 'txt' in txt_encoder:
+                txt_encoder = txt_encoder['txt'].to(device)
+        else:
+            status("Using random init sentence encoder")
+            txt_encoder = create_object(args.sent, vocab_size=len(vocab)).to(device)
+            if args.sent_init_method is None:
+                args.sent_init_method = args.init_method
+            status("Initialising txt_encoder with %s" % args.sent_init_method)
+            init(txt_encoder, init_method=args.sent_init_method)
 
-    cond_dim = txt_encoder.encoder.encoding_size
-    status("Sentence encode size = %d" % cond_dim)
+        assert(txt_encoder is not None)
+
+    cond_dim = 0
+    if txt_encoder is not None:
+        cond_dim = txt_encoder.encoder.encoding_size
+        status("Sentence encode size = %d" % cond_dim)
+    else:
+        status("Not using sentence encoder")
 
     gen = create_object(args.G, cond_dim=cond_dim).to(device)
     discrims = [ create_object(d).to(device) for d in args.D ]
 
     init(gen, init_method=args.init_method)
-    for discrim in discrims:
+    status("Initialising gen with %s" % args.init_method)
+    for i, discrim in enumerate(discrims):
+        discrim_name = "discrim-%d" % i
+        if args.D_names is not None and len(args.D_names) > i:
+            discrim_name = args.D_names[i]
+        status("Initialising discrim %s with %s" % (discrim_name, args.init_method))
         init(discrim, init_method=args.init_method)
 
     sample_mapping = None
     if args.M:
+        status("Creating sample mapping: %s" % args.M)
         sample_mapping = create_object(args.M).to(device)
+        status("Initialising sample_mapping %s with %s" % (args.M, args.init_method))
         init(sample_mapping, init_method=args.init_method)
 
     gan = CondGan(gen=gen, discrims=discrims, cond_encoder=txt_encoder, sample_mapping=sample_mapping, discrim_names=args.D_names, discrim_lambdas=args.D_lambdas)
@@ -60,7 +76,7 @@ def main(args):
     D_params = [ { "params": p } for p in gan.discrims_params ]
     G_params = [ { "params": gen.parameters() } ]
 
-    if args.end2end:
+    if args.end2end and txt_encoder is not None:
         # TODO: should I update txt_encoder in generator or discriminator exclusively?
         D_params.append({"params": txt_encoder.parameters()})
         G_params.append({"params": txt_encoder.parameters()})
@@ -86,10 +102,10 @@ def main(args):
     status('Loading data from %s' % args.data)
     dataset = load_data(video_dir=args.data, anno=args.anno, vocab=vocab, batch_size=args.batch_size, val=False, num_workers=args.workers, num_channels=args.num_channels, random_frames=args.random_frames, frame_size=args.frame_size)
 
-    print('D optim=', optD)
-    print('G optim=', optG)
-    print(gen)
-    print(txt_encoder)
+    print("D optim=", optD)
+    print("G optim=", optG)
+    print('gen=', gen)
+    print('txt=', txt_encoder)
     for filepath, name, discrim in zip(args.D, gan.discrim_names, gan.discrims):
         print("%s (%s)" % (filepath, name))
         print(discrim)
@@ -150,6 +166,7 @@ if __name__ == '__main__':
     parser.add_argument('--sent', type=str, default=None, help='Sentence model')
     parser.add_argument('--sent_init_method', type=str, default=None, help='Sentence model init, by default will do the same as regular init_method')
 
+    parser.add_argument('--dont_use_sent', action='store_true', default=False, help='uses the sentence model (i.e. non-conditional case)')
     parser.add_argument('--end2end', action='store_true', default=False, help='trains the model end2end, i.e. the sentence (cond) model is not frozen')
     parser.add_argument('--sgd', action='store_true', default=False, help='use SGD with momentum instead of adam (uses beta1)')
     parser.add_argument('--sequence_first', action='store_true', default=False, help='puts sequence first before channels in input to models')

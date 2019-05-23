@@ -20,7 +20,7 @@ def add_params_to_parser(parser):
     parser.add_argument('--save_initial', action='store_true', default=False, help='save initial model')
     parser.add_argument('--save_initial_examples', action='store_true', default=False, help='save initial sample')
     parser.add_argument('--save_model_period', type=int, default=100, help='number of iters until model is saved')
-    parser.add_argument('--save_example_period', type=int, default=100, help='number of iters until model is saved')
+    parser.add_argument('--save_example_period', type=int, default=50, help='number of iters until model is saved')
     parser.add_argument('--use_writer', action='store_true', default=False, help='write losses to SummaryWriter (tensorboardX)')
     parser.add_argument('--out', type=str, default='out', help='dir output path')
     parser.add_argument('--out_samples', type=str, default='out_samples', help='dir output path')
@@ -156,8 +156,13 @@ def train(gan=None, num_epoch=None, dataset=None, device=None, optD=None, optG=N
                     # TODO: check
                     with open('%s/fake_sentences_epoch%03d_iter_%06d.txt' % (params.out_samples, epoch, iteration), 'w') as out_f:
                         for cap in captions:
-                            for tok in cap:
-                                out_f.write('%s ' % vocab.get_word(int(tok)))
+                            words = None
+                            try:
+                                words = vocab.to_words(cap)
+                            except:
+                                words = cap
+
+                            out_f.write(words)
                             out_f.write('\n')
 
 

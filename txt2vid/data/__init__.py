@@ -164,6 +164,8 @@ class Vocab(object):
             self.idx += 1
 
     def get_word(self, idx):
+        if idx not in self.idx2word:
+            return self.UNKNOWN
         return self.idx2word[idx]
 
     def __call__(self, word):
@@ -185,9 +187,9 @@ class Vocab(object):
                 yield word
 
     def to_words(self, tokens):
-        result = ''
+        result = u''
         for i, tok in enumerate(tokens):
-            word = self.get_word(int(tok)) 
+            word = self.get_word(int(tok))
             if word != self.END and i != 0:
                 result += ' '
             result += word

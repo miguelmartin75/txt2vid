@@ -77,7 +77,8 @@ class CondGan(object):
         if self.cond_encoder is not None:
             self.cond_encoder.zero_grad()
 
-        fake_mapping = self._map_input(fake.detach())
+        # TODO: detach?
+        fake_mapping = self._map_input(fake)
 
         losses = []
         for r, name, discrim in zip(real_pred, self.discrim_names, self.discrims):
@@ -102,13 +103,16 @@ class CondGan(object):
                 fake_cond = real_cond[gen_perm(real_cond.size(0))]
 
             l, f, r = self.discrim_forward(name=name, 
-                                           discrim=discrim, 
-                                           real_cond=real_cond, 
-                                           fake_cond=fake_cond, 
+                                           discrim=discrim,
+
                                            real=real, 
+                                           real_cond=real_cond, 
+                                           real_mapping=real_mapping,
+
                                            fake=fake, 
-                                           real_mapping=real_mapping, 
+                                           fake_cond=fake_cond, 
                                            fake_mapping=fake_mapping, 
+
                                            loss=loss,
                                            gp_lambda=gp_lambda)
             

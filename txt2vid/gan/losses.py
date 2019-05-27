@@ -151,7 +151,7 @@ def gradient_penalty(discrim, real_x=None, real_xbar=None, fake_x=None, fake_xba
     gradients = grad(outputs=interpolates, inputs=inputs, grad_outputs=torch.ones(interpolates.size(), device=interpolates.device), create_graph=True, retain_graph=True, only_inputs=True)[0]
 
     gradients = gradients.view(batch_size, -1)
-    gp = ((gradients.norm(2, dim=1) - 1) ** 2).mean()
+    #gp = ((gradients.norm(2, dim=1) - 1) ** 2).mean()
     # zero centered
-    #gp = (gradients.norm(1, dim=1) ** 2).mean()
+    gp = (gradients.norm(2, dim=1) ** 2).mean()
     return gp

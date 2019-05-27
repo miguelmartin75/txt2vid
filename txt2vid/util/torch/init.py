@@ -5,7 +5,14 @@ def _weight_init(layer, init_func=None):
     name = layer.__class__.__name__
     if 'Linear' in name or 'Conv' in name or 'Embedding' in name:
         if hasattr(layer, 'weight') and layer.weight is not None:
-            init_func(layer.weight)
+            if hasattr(layer, 'is_residual') and layer.is_residual:
+                print('residual', name)
+                import math
+                factor = math.sqrt(2)
+                init_func(layer.weight, gain=factor)
+            else:
+                init_func(layer.weight)
+
 
         if hasattr(layer, 'bias') and layer.bias is not None:
             layer.bias.data.fill_(0.0)

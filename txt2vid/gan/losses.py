@@ -118,23 +118,26 @@ def gradient_penalty(discrim, real_x=None, real_xbar=None, fake_x=None, fake_xba
     assert(fake_x.size(0) == real_x.size(0))
 
     batch_size = real_x.size(0)
-    alpha = torch.rand(batch_size)
 
+    # video
+    #alpha = torch.rand(batch_size, 1, 1, 1, 1, requires_grad=True)
+    # imgs
+    alpha = torch.rand(batch_size, 1, 1, 1, requires_grad=True)
+    #print("n_element=", real_x.n_element())
+    #alpha.expand(batch_size, int(real_x.nelement())/batch_size).contiguous()
     alpha_x = alpha.expand_as(real_x).to(real_x.device)
     interpolate_x = alpha_x * real_x + ((1 - alpha_x) * fake_x)
-    interpolate_x = torch.Variable(interpolate_x, requires_grad=True)
 
     interpolate_xbar = None
     if real_xbar is not None and fake_xbar is not None:
         alpha_xbar = alpha.expand_as(real_xbar).to(real_xbar.device)
         interpolate_xbar = alpha_xbar * real_xbar + ((1 - alpha_xbar) * fake_xbar)
-        interpolate_xbar = torch.Variable(interpolate_xbar, requires_grad=True)
 
     interpolate_cond = None
     if real_cond is not None and fake_cond is not None:
+        alpha = alpha.squeeze().unsqueeze(1)
         alpha_cond = alpha.expand_as(real_cond).to(real_cond.device)
         interpolate_cond = alpha_cond * real_cond + ((1 - alpha_cond) * fake_cond)
-        interpolate_cond = torch.Variable(interpolate_cond, requires_grad=True)
 
     inputs = [ interpolate_x ]
     if interpolate_cond is not None:
@@ -146,4 +149,9 @@ def gradient_penalty(discrim, real_x=None, real_xbar=None, fake_x=None, fake_xba
 
     from torch.autograd import grad
     gradients = grad(outputs=interpolates, inputs=inputs, grad_outputs=torch.ones(interpolates.size(), device=interpolates.device), create_graph=True, retain_graph=True, only_inputs=True)[0]
-    return ((gradients.norm(2, dim=1) - 1) ** 2).mean()
+
+    gradients = gradients.view(batch_size, -1)
+    gp = ((gradients.norm(2, dim=1) - 1) ** 2).mean()
+    # zero centered
+    #gp = (gradients.norm(1, dim=1) ** 2).mean()
+    return gp

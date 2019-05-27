@@ -11,7 +11,6 @@ import torch.optim as optim
 import torch.utils.data
 from torchvision import transforms
 
-from txt2vid.data import Vocab, load_data
 from txt2vid.train.setup import setup
 from txt2vid.gan.trainer import train, add_params_to_parser
 from txt2vid.gan.losses import MixedGanLoss
@@ -21,6 +20,8 @@ from txt2vid.util.misc import gen_perm
 from txt2vid.util.reflection import create_object
 from txt2vid.util.torch.init import init
 from txt2vid.gan.cond_gan import CondGan
+from txt2vid.data import Vocab
+import txt2vid.data as data
 
 def main(args):
     seed, device = setup(args)
@@ -53,7 +54,7 @@ def main(args):
         status("Not using sentence encoder")
 
     gen = create_object(args.G, cond_dim=cond_dim).to(device)
-    discrims = [ create_object(d).to(device) for d in args.D ]
+    discrims = [ create_object(d, cond_dim=cond_dim).to(device) for d in args.D ]
 
     init(gen, init_method=args.init_method)
     status("Initialising gen with %s" % args.init_method)
@@ -100,7 +101,10 @@ def main(args):
             optG.load_state_dict(to_load['optG'])
 
     status('Loading data from %s' % args.data)
-    dataset = load_data(video_dir=args.data, anno=args.anno, vocab=vocab, batch_size=args.batch_size, val=False, num_workers=args.workers, num_channels=args.num_channels, random_frames=args.random_frames, frame_size=args.frame_size)
+
+    transform = data.default_transform(frame_size=args.frame_size, num_channels=args.num_channels)
+    dset = create_object(args.data, vocab=vocab, anno=args.anno, transform=transform)
+    dataset = data.get_loader(dset=dset, batch_size=args.batch_size, val=False, num_workers=args.workers, has_captions=args.anno is not None)
 
     print("D optim=", optD)
     print("G optim=", optG)
@@ -153,9 +157,9 @@ if __name__ == '__main__':
     parser.add_argument('--weights', type=str, help='pretrained weights for G and D', default=None)
     parser.add_argument('--sent_weights', type=str, default=None, help='pretrained model for the sentence encoder')
 
-    parser.add_argument('--data', type=str, help='video directory', required=True)
-    parser.add_argument('--anno', type=str, help='annotation location', required=True)
-    parser.add_argument('--vocab', type=str, help='vocab location', required=True)
+    parser.add_argument('--data', type=str, help='dataset function (use json to provide arguments)', required=True)
+    parser.add_argument('--anno', type=str, help='annotation', default=None)
+    parser.add_argument('--vocab', type=str, help='vocab', default=None)
 
     # Model specific
     parser.add_argument('--M', type=str, default=None, help='mapping for x')

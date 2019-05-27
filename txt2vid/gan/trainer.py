@@ -8,6 +8,9 @@ import torch
 import torchvision.utils as vutils
 
 def add_params_to_parser(parser):
+    parser.add_argument('--data_is_imgs', action='store_true', default=False, help='is the data images? If not, assume it is videos')
+    parser.add_argument('--img_model', action='store_true', default=False, help='does the GAN only do images?')
+
     parser.add_argument('--log_period', type=int, default=20, help='period to log')
     parser.add_argument('--loss_window_size', type=int, default=20, help='window size for logging')
     parser.add_argument('--no_mean_discrim_loss', action='store_false', default=True, help='divides each discrim step loss by discrim_steps')
@@ -22,11 +25,12 @@ def add_params_to_parser(parser):
     parser.add_argument('--save_initial', action='store_true', default=False, help='save initial model')
     parser.add_argument('--save_initial_examples', action='store_true', default=False, help='save initial sample')
     parser.add_argument('--save_model_period', type=int, default=100, help='number of iters until model is saved')
-    parser.add_argument('--save_example_period', type=int, default=50, help='number of iters until model is saved')
+    parser.add_argument('--save_example_period', type=int, default=100, help='number of iters until model is saved')
     parser.add_argument('--use_writer', action='store_true', default=False, help='write losses to SummaryWriter (tensorboardX)')
     parser.add_argument('--out', type=str, default='out', help='dir output path')
     parser.add_argument('--out_samples', type=str, default='out_samples', help='dir output path')
 
+    # TODO: just allow custom datasets in main
     return parser
 
 # TODO: generalise
@@ -51,21 +55,27 @@ def train(gan=None, num_epoch=None, dataset=None, device=None, optD=None, optG=N
         if params.log_period > 0:
             status('Epoch %d started' % (epoch + 1))
 
-        for i, (videos, captions, lengths) in enumerate(dataset):
+        for i, data in enumerate(dataset):
             iteration = epoch*len(dataset) + i + 1
 
-            videos = videos.to(device)
-            captions = captions.to(device)
+            x = data[0].to(device)
+            y = [ a.to(device) if isinstance(a, torch.Tensor) else a for a in data[1:] ]
 
-            if channel_first:
-                videos = videos.permute(0, 2, 1, 3, 4)
+            batch_size = x.size(0)
+            num_frames = 1
+            if not params.data_is_imgs:
+                if channel_first:
+                    x = x.permute(0, 2, 1, 3, 4)
+                num_frames = x.size(2)
 
-            batch_size = videos.size(0)
-            num_frames = videos.size(2)
+            if params.img_model and not params.data_is_imgs:
+                # make it an image
+                # note: assumes x.size(2) == num_frames == 1
+                x = x.squeeze(2)
 
             cond = None
-            if gan.cond_encoder is not None:
-                _, _, cond = gan.cond_encoder.encode(captions, lengths)
+            if gan.cond_encoder is not None and len(y) >= 2:
+                _, _, cond = gan.cond_encoder.encode(y[0], y[1])
                 if not end2end:
                     cond = cond.detach()
 
@@ -76,12 +86,13 @@ def train(gan=None, num_epoch=None, dataset=None, device=None, optD=None, optG=N
             # discrim step
             total_discrim_loss = 0
             for j in range(params.discrim_steps):
-                loss = gan.discrim_step(real=videos,
+                loss = gan.discrim_step(real=x,
                                         fake=fake.detach(),
                                         cond=cond,
-                                        loss=losses.discrim_loss)
+                                        loss=losses.discrim_loss,
+                                        gp_lambda=params.gp_lambda)
 
-                if not params.no_mean_gen_loss:
+                if not params.no_mean_discrim_loss:
                     loss /= params.discrim_steps
                 
                 loss.backward(retain_graph=j != params.discrim_steps - 1 or end2end)
@@ -93,11 +104,10 @@ def train(gan=None, num_epoch=None, dataset=None, device=None, optD=None, optG=N
 
             discrim_loss.update(float(total_discrim_loss))
 
-            _, _, real_pred = gan.all_discrim_forward(real=videos, cond=cond, fake=None, loss=None)
+            _, _, real_pred = gan.all_discrim_forward(real=x, cond=cond, fake=None, loss=None)
 
             # generator
             total_g_loss = 0
-            total_g_loss_recon = 0
             for j in range(params.gen_steps):
                 if j != 0:
                     fake = gan(z, cond=cond)
@@ -129,12 +139,12 @@ def train(gan=None, num_epoch=None, dataset=None, device=None, optD=None, optG=N
             if params.log_period > 0 and iteration % params.log_period == 0:
                 #gc.collect()
                 sys.stdout.flush()
-                status('[%d/%d][%d/%d] Loss_D: %.4f Loss_G: %.4f' % 
-                        (epoch, num_epoch, i, len(dataset), discrim_loss.get(), gen_loss.get()))
+                status('[%d/%d][%d/%d] Iter %d, Loss_D: %.4f Loss_G: %.4f' % 
+                        (epoch, num_epoch, i, len(dataset), iteration, discrim_loss.get(), gen_loss.get()))
 
             if params.save_example_period > 0:
                 if (iteration == 1 and params.save_initial_examples) or iteration % params.save_example_period == 0:
-                    to_save_real = videos
+                    to_save_real = x
                     to_save_fake = fake
 
                     # TODO: this is different
@@ -143,6 +153,12 @@ def train(gan=None, num_epoch=None, dataset=None, device=None, optD=None, optG=N
                     # for now this is fine
 
                     if channel_first:
+                        if params.img_model:
+                            to_save_real = to_save_real.unsqueeze(2)
+                            to_save_fake = to_save_fake.unsqueeze(2)
+
+                        print('real=', to_save_real.size())
+                        print('fake=', to_save_fake.size())
                         to_save_real = to_save_real.permute(0, 2, 1, 3, 4)
                         to_save_fake = to_save_fake.permute(0, 2, 1, 3, 4).contiguous()
 
@@ -151,21 +167,21 @@ def train(gan=None, num_epoch=None, dataset=None, device=None, optD=None, optG=N
                     to_save_real = to_save_real.view(-1, to_save_real.size(2), to_save_real.size(3), to_save_real.size(4))
                     to_save_fake = to_save_fake.view(-1, to_save_fake.size(2), to_save_fake.size(3), to_save_fake.size(4))
 
-                    status('saving to %s' % params.out_samples)
-                    #print(to_save_real.size())
-                    vutils.save_image(to_save_real, '%s/real_samples.png' % params.out_samples, normalize=True, nrow=num_frames) #to_save_real.size(0))
-                    vutils.save_image(to_save_fake, '%s/fake_samples_epoch_%03d_iter_%06d.png' % (params.out_samples, epoch, iteration), normalize=True, nrow=num_frames)#to_save_fake.size(0))
-                    # TODO: check
-                    with open('%s/fake_sentences_epoch%03d_iter_%06d.txt' % (params.out_samples, epoch, iteration), 'w') as out_f:
-                        for cap in captions:
-                            words = None
-                            try:
-                                words = vocab.to_words(cap)
-                            except:
-                                words = cap
+                    status('saving to %s (iteration %d)' % (params.out_samples, iteration))
+                    vutils.save_image(to_save_real, '%s/real_samples.png' % params.out_samples, normalize=True, nrow=num_frames) 
+                    vutils.save_image(to_save_fake, '%s/fake_samples_epoch_%03d_iter_%06d.png' % (params.out_samples, epoch, iteration), normalize=True, nrow=num_frames)
 
-                            out_f.write(words)
-                            out_f.write('\n')
+                    if cond is not None:
+                        with open('%s/sentences_epoch%03d_iter_%06d.txt' % (params.out_samples, epoch, iteration), 'w') as out_f:
+                            for cap in y[0]:
+                                words = None
+                                try:
+                                    words = vocab.to_words(cap)
+                                except:
+                                    words = cap
+
+                                out_f.write(words)
+                                out_f.write('\n')
 
 
                     del to_save_fake

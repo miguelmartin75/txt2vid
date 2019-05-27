@@ -15,26 +15,18 @@ def to_pil(cv2_img):
     cv2_img = cv2.cvtColor(cv2_img, cv2.COLOR_BGR2RGB)
     return Image.fromarray(cv2_img)
 
-def read_video_file(video_path, vid, cache=None):
+# TODO: fix this shit, it's gross
+def read_video_file(video_path, convert_to_pil=True):
     video = cv2.VideoCapture(str(video_path))
 
-    idx = 0
-    while(video.isOpened()):
+    while video.isOpened():
         ok, frame = video.read()
 
         if not ok:
             break
 
-        frame = to_pil(frame)
-
-        if cache:
-            path_to_save = '%s/%s/%d.jpg' % (cache, vid, idx)
-            parent_path = Path(path_to_save).parent
-            if not parent_path.exists():
-                parent_path.mkdir()
-            frame.save(path_to_save)
-
-        idx += 1
+        if convert_to_pil:
+            frame = to_pil(frame)
 
         yield frame
 
@@ -48,12 +40,12 @@ class Dataset(data.Dataset):
     def get_cache_video_path(self, vid_id):
         return '%s/%s' % (self.video_dir, vid_id)
 
-
-    def __init__(self, video_dir=None, vocab=None, captions=None, transform=None, random_frames=0):
+    def __init__(self, video_dir=None, vocab=None, captions=None, transform=None, random_frames=0, num_frames=16):
         self.video_dir = video_dir
         self.transform = transform
         self.random_frames = random_frames
         self.vocab = vocab
+        self.num_frames = num_frames
 
         captions = load(captions)
 
@@ -94,8 +86,7 @@ class Dataset(data.Dataset):
 
         if self.random_frames == 0:
             new_frames = []
-            # TODO: remove 32 constant
-            NUM_FRAMES = 16
+            NUM_FRAMES = self.num_frames
             factor=int(len(frames)/NUM_FRAMES)
             i = 0
             while i < NUM_FRAMES:
@@ -235,18 +226,7 @@ def collate_fn(data):
         targets[i, :end] = cap[:end]        
     return vids, targets, lengths
 
-def get_loader(video_dir, captions, vocab, transform, batch_size, shuffle, num_workers, random_frames):
-    """Returns torch.utils.data.DataLoader for custom coco dataset."""
-    dset = Dataset(video_dir=video_dir, vocab=vocab, captions=captions, transform=transform, random_frames=random_frames) 
-
-    data_loader = torch.utils.data.DataLoader(dataset=dset, 
-                                              batch_size=batch_size,
-                                              shuffle=shuffle,
-                                              num_workers=num_workers,
-                                              collate_fn=collate_fn)
-    return data_loader
-
-def load_data(video_dir=None, vocab=None, anno=None, batch_size=64, val=False, num_workers=4, num_channels=3, random_frames=0, frame_size=[64]):
+def default_transform(frame_size=None, num_channels=3):
     if len(frame_size) == 1:
         frame_size.append(frame_size[0])
 
@@ -259,8 +239,20 @@ def load_data(video_dir=None, vocab=None, anno=None, batch_size=64, val=False, n
                                         transforms.Grayscale(),
                                         transforms.ToTensor(),
                                         transforms.Normalize([0.5], [0.5])])
+    return transform
 
-    return get_loader(video_dir, anno, vocab, transform, batch_size, shuffle=not val, num_workers=num_workers, random_frames=random_frames)
+def cifar10_dataset(data=None, vocab=None, anno=None, transform=None, download=True):
+    import torchvision.datasets as datasets
+    return datasets.CIFAR10(data, transform=transform, download=download)
+
+def mrvdc_dataset(data=None, vocab=None, anno=None, transform=None, random_frames=False, num_frames=16):
+    return Dataset(video_dir=data, vocab=vocab, captions=anno, transform=transform, random_frames=random_frames, num_frames=num_frames)
+
+def get_loader(dset=None, batch_size=64, val=False, num_workers=4, has_captions=False):
+    if has_captions:
+        return torch.utils.data.DataLoader(dataset=dset, batch_size=batch_size, shuffle=not val, num_workers=num_workers, collate_fn=collate_fn)
+    else:
+        return torch.utils.data.DataLoader(dataset=dset, batch_size=batch_size, shuffle=not val, num_workers=num_workers)
 
 def main(args):
     ex_to_sent = load(args.sents)

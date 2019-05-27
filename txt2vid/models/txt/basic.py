@@ -46,7 +46,7 @@ class RecurrentModel(nn.Module):
         embeddings = self.embed(x)
 
         from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
-        packed = pack_padded_sequence(embeddings, lengths, batch_first=True) 
+        packed = pack_padded_sequence(embeddings, lengths, batch_first=True)
         out, hidden = self.lstm(packed, initial_state)
         out, _ = pad_packed_sequence(out, batch_first=True, total_length=max_len)
 

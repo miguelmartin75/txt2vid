@@ -3,80 +3,75 @@ import torch.nn as nn
 
 class VideoDiscrim(nn.Module):
 
-    def __init__(self, txt_encode_size=256, num_filters=64, num_channels=3):
+    def __init__(self, cond_dim=256, mid_ch=64, num_channels=3, negative_slope=0.2, which_conv=nn.Conv3d):
         super().__init__()
 
-        self.vid = nn.Sequential(
-            nn.Conv3d(num_channels, 64, 4, 2, 1, bias=False), # 64
-            nn.BatchNorm3d(64),
-            nn.LeakyReLU(0.2, True),
+        self.f = nn.LeakyReLU(negative_slope, True)
 
-            nn.Conv3d(64, 128, 4, 2, 1, bias=False), # 128
-            nn.BatchNorm3d(128),
-            nn.LeakyReLU(0.2, True),
+        self.x_map = nn.Sequential(
+            which_conv(num_channels, mid_ch, 4, 2, 1, bias=False), # 64
+            #nn.BatchNorm3d(mid_ch),
+            self.f,
 
-            nn.Conv3d(128, 256, 4, 2, 1, bias=False), 
-            nn.BatchNorm3d(256),
-            nn.LeakyReLU(0.2, True),
+            which_conv(mid_ch, mid_ch*2, 4, 2, 1, bias=False), # 128
+            nn.BatchNorm3d(mid_ch*2),
+            self.f,
 
-            nn.Conv3d(256, 512, 4, 2, 1, bias=False), # 256
-            nn.BatchNorm3d(512),
-            #nn.LeakyReLU(0.2, True),
-            # ===
+            which_conv(mid_ch*2, mid_ch*4, 4, 2, 1, bias=False), 
+            nn.BatchNorm3d(mid_ch*4),
+            self.f,
 
-
-            #nn.BatchNorm3d(1024),
-            #nn.LeakyReLU(0.2, True),
-
-            #nn.Conv3d(1024, txt_encode_size, (2, 4, 4), (1, 1, 1), 0, bias=False), # 512
-            #nn.BatchNorm3d(txt_encode_size),
-            #nn.LeakyReLU(0.2, True),
+            which_conv(mid_ch*4, mid_ch*8, 4, 2, 1, bias=False), # 256
+            nn.BatchNorm3d(mid_ch*8),
+            self.f
         )
 
-        self.sent_map = nn.Sequential(
-            nn.Linear(txt_encode_size, txt_encode_size),
-            nn.BatchNorm1d(txt_encode_size),
-            nn.LeakyReLU(0.2, True)
-        )
+        if cond_dim > 0:
+            self.cond_map = nn.Sequential(
+                nn.Linear(cond_dim, cond_dim),
+                nn.BatchNorm1d(cond_dim),
+                self.f,
+            )
 
-        self.predictor = nn.Sequential(
-            nn.Conv3d(512 + txt_encode_size, 512, (1,1,1), 1, 0, bias=False),
-            nn.BatchNorm3d(512),
-            nn.LeakyReLU(0.2, True),
-            nn.Conv3d(512, 1, (1, 2, 2), (1, 2, 2), 0, bias=False),
-            #nn.LeakyReLU(0.2, True),
-            #nn.Linear(3*3, 1)
-            #nn.Sigmoid()
-        )
+            self.pred = nn.Sequential(
+                which_conv(mid_ch*8 + cond_dim, 512, 1, 1, 0, bias=False),
+                nn.BatchNorm3d(512),
+                self.f,
+                which_conv(mid_ch*8, 1, (1, 3, 3), 1, 0, bias=False)
+            )
+        else:
+            #self.pred = which_conv(mid_ch*8, 1, 3, 2, 0, bias=False)
+            self.pred = which_conv(mid_ch*8, 1, (1, 3, 3), 2, 0, bias=False)
 
     def forward(self, x=None, cond=None, xbar=None):
-        sent = self.sent_map(cond)
-        vids = self.vid(x)
+        x = self.x_map(x)
 
-        sent_temp = torch.zeros((vids.size(0), sent.size(1), vids.size(2), vids.size(3), vids.size(4)), device=x.device)
-        for i in range(vids.size(2)):
-            for j in range(vids.size(3)):
-                for k in range(vids.size(4)):
-                    sent_temp[:, :, i, j, k] = sent
+        if cond is not None:
+            cond = self.cond_map(cond)
+            cond = cond.view(cond.size(0), -1, 1, 1, 1)
+            cond = cond.expand([-1, -1, x.size(2), x.size(3), x.size(4)])
+            x = torch.cat((x, cond), dim=1)
 
-        sent = sent_temp
-        vids_plus_sent = torch.cat((vids, sent), dim=1)
-
-        pred = self.predictor(vids_plus_sent)
-        pred = pred.view(-1, 1).squeeze(1)
-        return pred
+        out = self.pred(x)
+        out = out.view(out.size(0), -1)
+        return out.mean()
 
 if __name__ == '__main__':
     batch_size = 64
     num_channels = 3
-    cond_size = 256
-    frame_size = 48
+    cond_size = 0
+    #frame_size = 48
+    frame_size = 64
     num_frames = 16
 
     vid = torch.randn(batch_size, num_channels, num_frames, frame_size, frame_size)
-    cond = torch.randn(batch_size, cond_size)
+    if cond_size == 0:
+        cond = None
+    else:
+        cond = torch.randn(batch_size, cond_size)
 
-    discrim = VideoDiscrim()
+    discrim = VideoDiscrim(cond_dim=cond_size)
+    print(discrim)
     out = discrim(x=vid, cond=cond)
 
     print("Output video discrim:", out.size())

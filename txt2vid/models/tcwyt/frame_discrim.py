@@ -38,7 +38,7 @@ class FrameMap(nn.Module):
 
 
 class FrameDiscrim(nn.Module):
-    def __init__(self, txt_encode_size=256):
+    def __init__(self, cond_dim=256):
         super().__init__()
 
         self.frame_map = nn.Sequential(
@@ -48,7 +48,7 @@ class FrameDiscrim(nn.Module):
         )
 
         self.predictor = nn.Sequential(
-            nn.Conv2d(512 + txt_encode_size, 512, 1, 1, 0, bias=False),
+            nn.Conv2d(512 + cond_dim, 512, 1, 1, 0, bias=False),
             nn.BatchNorm2d(512),
             nn.LeakyReLU(0.2, True),
 
@@ -59,8 +59,8 @@ class FrameDiscrim(nn.Module):
         )
 
         self.sent_map = nn.Sequential(
-            nn.Linear(txt_encode_size, txt_encode_size),
-            nn.BatchNorm1d(txt_encode_size),
+            nn.Linear(cond_dim, cond_dim),
+            nn.BatchNorm1d(cond_dim),
             nn.LeakyReLU(0.2, True)
         )
 

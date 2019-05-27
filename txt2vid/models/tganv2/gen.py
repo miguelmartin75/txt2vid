@@ -21,22 +21,22 @@ class BaseFrameGen(nn.Module):
 
 class MultiScaleGen(nn.Module):
 
-    def __init__(self, latent_size=128, width=64, height=64, num_channels=3, additional_blocks=[64, 32, 32]):
+    def __init__(self, latent_size=128, width=64, height=64, num_channels=3, additional_blocks=[64, 32, 32], fm_channels=1024, num_frames=16):
         super().__init__()
 
         self.subsample = Subsample()
 
         self.latent_size = latent_size
         # TODO: configure
-        self.fm_channels = 1024
+        self.fm_channels = fm_channels
         self.fm_width = (width // 64) 
         self.fm_height = (height // 64) 
         self.fm_size = self.fm_width * self.fm_height * latent_size
         self.fc = nn.Linear(latent_size, self.fm_size)
 
-        self.clstm = ConvLSTM(input_channels=self.latent_size, hidden_channels=[1024], kernel_size=3, step=16, effective_step=range(16))
+        self.clstm = ConvLSTM(input_channels=self.latent_size, hidden_channels=[self.fm_channels], kernel_size=3, step=num_frames, effective_step=range(num_frames))
         self.base = BaseFrameGen()
-        self.render_base = RenderBlock()
+        self.render_base = RenderBlock(in_channels=self.base.out_size, out_channels=num_channels)
 
         self.render_blocks = []
         self.abstract_blocks = []
@@ -64,6 +64,12 @@ class MultiScaleGen(nn.Module):
         def split_frames(a):
             return a.contiguous().view(-1, num_frames, a.size(1), a.size(2), a.size(3))
 
+        def channel_first(a):
+            return a.permute(0, 2, 1, 3, 4)
+
+        def time_first(a):
+            return a.permute(0, 2, 1, 3, 4)
+
         def merge_frames(a):
             return a.contiguous().view(-1, a.size(2), a.size(3), a.size(4))
 
@@ -73,23 +79,27 @@ class MultiScaleGen(nn.Module):
         abstract = [x]
         rendered = []
         if not only_render_last:
-            rendered.append(split_frames(self.render_base(x)))
+            r = split_frames(self.render_base(x))
+            r = channel_first(r)
+            rendered.append(r)
 
         for i in range(len(self.render_blocks)):
-            x = split_frames(x).permute(0, 2, 1, 3, 4)
+            x = channel_first(split_frames(x))
 
             bt = None
             if subsample_bts is not None:
                 bt = subsample_bts[i]
 
             x, _ = self.subsample(x, bt)
-            x = x.permute(0, 2, 1, 3, 4)
+            x = time_first(x)
             x = merge_frames(x)
             x = self.abstract_blocks[i](x)
             abstract.append(x)
             if not only_render_last or i == len(self.render_blocks) - 1:
-                rendered_x = self.render_blocks[i](x)
-                rendered.append(split_frames(rendered_x))
+                r = self.render_blocks[i](x)
+                r = split_frames(r)
+                r = channel_first(r)
+                rendered.append(r)
 
         return abstract, rendered
 

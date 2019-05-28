@@ -1,0 +1,6 @@
+{
+    "class": "txt2vid.data.cifar10_dataset",
+    "args": {
+        "data": "../cifar10"
+    }
+}

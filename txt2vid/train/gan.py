@@ -102,8 +102,13 @@ def main(args):
 
     status('Loading data from %s' % args.data)
 
-    transform = data.default_transform(frame_size=args.frame_size, num_channels=args.num_channels)
+    transform = data.default_transform(frame_size=[args.frame_sizes[-1]], num_channels=args.num_channels)
     dset = create_object(args.data, vocab=vocab, anno=args.anno, transform=transform)
+
+    #if args.multi_scale:
+    #    from txt2vid.models.tganv2.dset import MultiScaleDataset
+    #    dset = MultiScaleDataset(dset=dset)
+
     dataset = data.get_loader(dset=dset, batch_size=args.batch_size, val=False, num_workers=args.workers, has_captions=args.anno is not None)
 
     print("D optim=", optD)
@@ -135,7 +140,7 @@ if __name__ == '__main__':
     parser.add_argument('--ngpu', type=int, default=1, help='number of GPUs to use')
     
     # input
-    parser.add_argument('--frame_size', type=int, nargs='+', default=[64], help='frame size')
+    parser.add_argument('--frame_sizes', type=int, nargs='+', default=[64], help='frame sizes')
     parser.add_argument('--num_channels', type=int, default=1, help='number of channels in input')
     parser.add_argument('--random_frames', type=int, default=0, help='use random frames')
 

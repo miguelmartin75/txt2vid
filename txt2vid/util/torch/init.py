@@ -6,7 +6,6 @@ def _weight_init(layer, init_func=None):
     if 'Linear' in name or 'Conv' in name or 'Embedding' in name:
         if hasattr(layer, 'weight') and layer.weight is not None:
             if hasattr(layer, 'is_residual') and layer.is_residual:
-                print('residual', name)
                 import math
                 factor = math.sqrt(2)
                 init_func(layer.weight, gain=factor)

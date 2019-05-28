@@ -5,7 +5,7 @@ from txt2vid.models.layers import ResidualBlock, DownBlock
 
 class Resnet3D(nn.Module):
 
-    def __init__(self, num_channels=3, mid_ch=64, which_conv=nn.Conv3d, which_pool=nn.AvgPool3d):
+    def __init__(self, num_channels=3, mid_ch=64, which_conv=nn.Conv3d, which_pool=nn.AvgPool3d, cond_dim=0):
         super().__init__()
         self.activation = nn.ReLU(True)
 
@@ -24,7 +24,7 @@ class Resnet3D(nn.Module):
         self.down3 = DownBlock(in_channels=512, out_channels=1024)
         self.fc = nn.Linear(1024, 1)
     
-    def forward(self, x):
+    def forward(self, x=None, cond=None, xbar=None):
         x = self.res_block(x)
 
         x = self.activation(x)

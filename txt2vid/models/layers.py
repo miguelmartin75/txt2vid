@@ -89,8 +89,10 @@ class UpBlock(nn.Module):
     def __init__(self, in_channels=128, out_channels=None, which_bn=nn.BatchNorm2d, which_conv=nn.Conv2d, which_unpool=nn.ConvTranspose2d):
         super().__init__()
 
+        self.in_channels = in_channels
         if out_channels is None:
             out_channels = in_channels
+        self.out_channels = out_channels
 
         main_path = nn.Sequential(
             which_bn(in_channels),

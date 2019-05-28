@@ -39,7 +39,6 @@ class ConvLSTMCell(nn.Module):
 
     def init_hidden(self, batch_size, shape, hidden=None):
         device = self.Wxi.weight.device
-        print(device)
 
         if hidden is None:
             hidden = self.hidden

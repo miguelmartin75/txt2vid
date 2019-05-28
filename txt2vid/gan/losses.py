@@ -57,9 +57,13 @@ class WassersteinGanLoss(object):
         pass
 
     def discrim_loss(self, fake=None, real=None):
+        #print("real=", real.size())
+        #print("fake=", fake.size())
         return -(real.mean() - fake.mean())
 
     def gen_loss(self, fake=None, real=None):
+        #print("real=", real.size())
+        #print("fake=", fake.size())
         return -fake.mean()
 
 # Relativistic average Standard GAN (RaSGAN)
@@ -114,17 +118,16 @@ class RaLSGANLoss(object):
         loss += torch.mean((fake - torch.mean(real) - y_real) ** 2)
         return loss / 2
 
-def gradient_penalty(discrim, real_x=None, real_xbar=None, fake_x=None, fake_xbar=None, real_cond=None, fake_cond=None):
-    assert(fake_x.size(0) == real_x.size(0))
-
+def _gradient_penalty(discrim, real_x=None, real_xbar=None, fake_x=None, fake_xbar=None, real_cond=None, fake_cond=None, zero_center=False, combine=torch.mean):
     batch_size = real_x.size(0)
 
     # video
-    #alpha = torch.rand(batch_size, 1, 1, 1, 1, requires_grad=True)
-    # imgs
-    alpha = torch.rand(batch_size, 1, 1, 1, requires_grad=True)
-    #print("n_element=", real_x.n_element())
-    #alpha.expand(batch_size, int(real_x.nelement())/batch_size).contiguous()
+    if real_x.dim() == 4:
+        alpha = torch.rand(batch_size, 1, 1, 1, requires_grad=True)
+    else:
+        assert(real_x.dim() == 5)
+        alpha = torch.rand(batch_size, 1, 1, 1, 1, requires_grad=True)
+
     alpha_x = alpha.expand_as(real_x).to(real_x.device)
     interpolate_x = alpha_x * real_x + ((1 - alpha_x) * fake_x)
 
@@ -151,7 +154,31 @@ def gradient_penalty(discrim, real_x=None, real_xbar=None, fake_x=None, fake_xba
     gradients = grad(outputs=interpolates, inputs=inputs, grad_outputs=torch.ones(interpolates.size(), device=interpolates.device), create_graph=True, retain_graph=True, only_inputs=True)[0]
 
     gradients = gradients.view(batch_size, -1)
-    #gp = ((gradients.norm(2, dim=1) - 1) ** 2).mean()
-    # zero centered
-    gp = (gradients.norm(2, dim=1) ** 2).mean()
+
+    if zero_center:
+        gp = combine(gradients.norm(2, dim=1) ** 2)
+    else:
+        gp = combine((gradients.norm(2, dim=1) - 1) ** 2)
     return gp
+
+def gradient_penalty(discrim, real_x=None, real_xbar=None, fake_x=None, fake_xbar=None, real_cond=None, fake_cond=None):
+    if hasattr(discrim, 'sub_discrims'):
+        gradients = []
+        for i in range(len(real_x)):
+            if real_cond is None:
+                rx, rxbar, rcond = real_x[i], None, None
+                fx, fxbar, fcond = fake_x[i], None, None
+            else:
+                rx, rxbar, rcond = real_x[i], real_xbar[i], real_cond[i]
+                fx, fxbar, fcond = fake_x[i], fake_xbar[i], fake_cond[i]
+
+            gp = _gradient_penalty(discrim.sub_discrims[i], real_x=rx, real_xbar=rxbar, real_cond=rcond, fake_x=fx, fake_xbar=fxbar, fake_cond=fcond, zero_center=True, combine=torch.sum)
+            gradients.append(gp)
+
+        return torch.stack(gradients).sum()
+    else:
+        return _gradient_penalty(discrim, real_x=real_x, real_xbar=real_xbar, fake_x=fake_x, fake_xbar=fake_xbar, real_cond=real_cond, fake_cond=fake_cond)
+
+
+    #assert(fake_x.size(0) == real_x.size(0))
+

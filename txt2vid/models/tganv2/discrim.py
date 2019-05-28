@@ -6,31 +6,27 @@ from txt2vid.models.resnet3d import Resnet3D
 
 class MultiScaleDiscrim(nn.Module):
 
-    def __init__(self, num_discrims=4, num_channels=3):
+    def __init__(self, num_discrims=4, num_channels=3, cond_dim=0, underlying_discrim=Resnet3D):
         super().__init__()
 
-        self.discrims = []
+        self.sub_discrims = []
         for i in range(num_discrims):
-            self.discrims.append(Resnet3D())
-        self.discrims = nn.ModuleList(self.discrims)
-        self.combine = torch.sum
-        self.classify = F.sigmoid
+            self.sub_discrims.append(underlying_discrim(cond_dim=cond_dim))
+        self.sub_discrims = nn.ModuleList(self.sub_discrims)
 
-    def forward(self, x):
-        abstract = x[0]
-        rendered = x[1]
-
-        out = 0
-        for i, r in enumerate(reversed(rendered)):
-            discrim = self.discrims[len(self.discrims) - 1 - i]
-            pred = discrim(r)
-            out += self.combine(pred)
-        out = self.classify(out)
+    def forward(self, x=None, cond=None, xbar=None):
+        # TODO: cond
+        from torch.nn.parallel import data_parallel
+        out = []
+        for i, r in enumerate(x):
+            discrim = self.sub_discrims[i]
+            pred = data_parallel(discrim, r)
+            out.append(pred)
         return out
 
 if __name__ == '__main__':
     batch_size = 64
-    latent_size=256
+    latent_size = 256
     device = 'cuda:0'
     from txt2vid.models.tganv2.gen import MultiScaleGen
     gen = MultiScaleGen(latent_size=latent_size, width=128, height=128).to(device)
@@ -41,8 +37,13 @@ if __name__ == '__main__':
     print(discrim)
     out = discrim(z)
 
-    print(out)
-    print(out.size())
+    #print(a[::2].size())
+    #for x in out:
+    #    a[::2] += x
+    #    a = a[::2]
+        #print(x.size())
+    #print(out)
+    #print(out.size())
 
     from txt2vid.util.misc import count_params
     print("Num params = %d" % count_params(discrim))

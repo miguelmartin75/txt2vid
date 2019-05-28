@@ -1,11 +1,15 @@
 import sys
 
+import numpy as np
+
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+import torchvision.utils as vutils
+
 from txt2vid.util.dir import ensure_exists
 from txt2vid.util.log import status
 from txt2vid.util.metrics import RollingAvgLoss
-
-import torch
-import torchvision.utils as vutils
 
 def add_params_to_parser(parser):
     parser.add_argument('--data_is_imgs', action='store_true', default=False, help='is the data images? If not, assume it is videos')
@@ -16,6 +20,7 @@ def add_params_to_parser(parser):
     parser.add_argument('--no_mean_discrim_loss', action='store_false', default=True, help='divides each discrim step loss by discrim_steps')
     parser.add_argument('--no_mean_gen_loss', action='store_false', default=True, help='divides each gen step loss by gen_steps')
 
+    parser.add_argument('--sample_batch_size', type=int, default=None, help='batch size to gen samples')
     parser.add_argument('--discrim_steps', type=int, default=1, help='Number of discriminator steps to use per iteration')
     parser.add_argument('--gen_steps', type=int, default=1, help='Number of generator steps to use per iteration')
 
@@ -30,6 +35,8 @@ def add_params_to_parser(parser):
     parser.add_argument('--out', type=str, default='out', help='dir output path')
     parser.add_argument('--out_samples', type=str, default='out_samples', help='dir output path')
 
+    parser.add_argument('--subsample_input', action='store_true', default=False, help='should subsampling be applied to the input?')
+
     # TODO: just allow custom datasets in main
     return parser
 
@@ -39,6 +46,9 @@ def train(gan=None, num_epoch=None, dataset=None, device=None, optD=None, optG=N
         status("Parameter settings:")
         print(locals())
         print()
+
+    if params.sample_batch_size is None:
+        params.sample_batch_size = params.batch_size
 
     ensure_exists(params.out)
     ensure_exists(params.out_samples)
@@ -50,6 +60,47 @@ def train(gan=None, num_epoch=None, dataset=None, device=None, optD=None, optG=N
     if params.use_writer:
         from tensorboardX import SummaryWriter
         writer = SummaryWriter()
+
+    def detach_all(x):
+        return [ y.detach() for y in x ]
+
+    def multiscale_data(x, cond, device=None):
+        assert(channel_first)
+
+        num_data_points = len(params.frame_sizes)
+        if num_data_points == 1:
+            if cond is None:
+                return [x], None
+            else:
+                return [x], [cond]
+
+        from txt2vid.models.layers import Subsample
+        subsampler = Subsample()
+
+        xs, conds = [], []
+        for i in range(num_data_points):
+            num_frames = x.size(2)
+            if i != num_data_points - 1:
+                fs = params.frame_sizes[i]
+                resized = F.interpolate(x, size=(num_frames, fs, fs))
+            else:
+                resized = x
+
+            #print(i, resized.size())
+            xs.append(resized)#.to(device))
+
+            if params.subsample_input:
+                x, _ = subsampler(x)
+                if cond is not None:
+                    cond = cond[::2]
+
+            if cond is not None:
+                conds.append(cond)
+
+        if len(conds) == 0:
+            return xs, None
+
+        return xs, conds
 
     for epoch in range(num_epoch):
         if params.log_period > 0:
@@ -64,20 +115,37 @@ def train(gan=None, num_epoch=None, dataset=None, device=None, optD=None, optG=N
             batch_size = x.size(0)
             num_frames = 1
             if not params.data_is_imgs:
+                num_frames = x.size(1)
                 if channel_first:
                     x = x.permute(0, 2, 1, 3, 4)
-                num_frames = x.size(2)
 
             if params.img_model and not params.data_is_imgs:
                 # make it an image
                 # note: assumes x.size(2) == num_frames == 1
                 x = x.squeeze(2)
 
+            #print("Multi-scale =")
+            #for i, d in enumerate(x):
+            #    print(d.size())
+            #    num_frames = d.size(2)
+
+            #    to_save_real = d
+            #    if channel_first:
+            #        to_save_real = to_save_real.permute(0, 2, 1, 3, 4).contiguous()
+            #    to_save_real = to_save_real.view(-1, to_save_real.size(2), to_save_real.size(3), to_save_real.size(4))
+            #    print("saving to", params.out_samples)
+            #    print("d.size=", d.size())
+            #    print("save.size=", to_save_real.size())
+            #    vutils.save_image(to_save_real, '%s/real_samples_%d.png' % (params.out_samples, i), normalize=True, nrow=num_frames) 
+
             cond = None
             if gan.cond_encoder is not None and len(y) >= 2:
                 _, _, cond = gan.cond_encoder.encode(y[0], y[1])
                 if not end2end:
                     cond = cond.detach()
+
+            # get the different scales for the data
+            x, cond = multiscale_data(x, cond, device=device)
 
             # TODO: configure prior sample space
             z = torch.randn(batch_size, gan.gen.latent_size, device=device)
@@ -87,7 +155,7 @@ def train(gan=None, num_epoch=None, dataset=None, device=None, optD=None, optG=N
             total_discrim_loss = 0
             for j in range(params.discrim_steps):
                 loss = gan.discrim_step(real=x,
-                                        fake=fake.detach(),
+                                        fake=detach_all(fake),
                                         cond=cond,
                                         loss=losses.discrim_loss,
                                         gp_lambda=params.gp_lambda)
@@ -144,32 +212,46 @@ def train(gan=None, num_epoch=None, dataset=None, device=None, optD=None, optG=N
 
             if params.save_example_period > 0:
                 if (iteration == 1 and params.save_initial_examples) or iteration % params.save_example_period == 0:
-                    to_save_real = x
-                    to_save_fake = fake
+                    to_save_real = x[0]
+
+                    #gan.gen.eval()
+                    #with torch.no_grad():
+                    #    z = torch.randn(params.sample_batch_size, gan.gen.latent_size, device=device)
+                    #    cond_to_use = None
+                    #    if cond is not None:
+                    #        cond_to_use = cond[0][0:params.sample_batch_size]
+
+                    #    fake = gan(z, cond=cond_to_use)
+                    #gan.gen.train()
 
                     # TODO: this is different
                     # depending on the generator
                     # so the generator should probs format or save examples
                     # for now this is fine
+                    status('saving to %s (iteration %d)' % (params.out_samples, iteration))
 
                     if channel_first:
                         if params.img_model:
                             to_save_real = to_save_real.unsqueeze(2)
-                            to_save_fake = to_save_fake.unsqueeze(2)
+                        to_save_real = to_save_real.permute(0, 2, 1, 3, 4).contiguous()
 
-                        print('real=', to_save_real.size())
-                        print('fake=', to_save_fake.size())
-                        to_save_real = to_save_real.permute(0, 2, 1, 3, 4)
-                        to_save_fake = to_save_fake.permute(0, 2, 1, 3, 4).contiguous()
-
-                    num_frames = to_save_real.size(1)
-
+                    num_frames_real = to_save_real.size(1)
                     to_save_real = to_save_real.view(-1, to_save_real.size(2), to_save_real.size(3), to_save_real.size(4))
-                    to_save_fake = to_save_fake.view(-1, to_save_fake.size(2), to_save_fake.size(3), to_save_fake.size(4))
+                    vutils.save_image(to_save_real, '%s/real_samples.png' % params.out_samples, normalize=True, nrow=num_frames_real)
 
-                    status('saving to %s (iteration %d)' % (params.out_samples, iteration))
-                    vutils.save_image(to_save_real, '%s/real_samples.png' % params.out_samples, normalize=True, nrow=num_frames) 
-                    vutils.save_image(to_save_fake, '%s/fake_samples_epoch_%03d_iter_%06d.png' % (params.out_samples, epoch, iteration), normalize=True, nrow=num_frames)
+                    for to_save_fake in fake:
+                        if channel_first:
+                            if params.img_model:
+                                to_save_fake = to_save_fake.unsqueeze(2)
+
+                            to_save_fake = to_save_fake.permute(0, 2, 1, 3, 4).contiguous()
+
+                        num_frames_fake = to_save_real.size(1)
+                        h, w = to_save_fake.size(3), to_save_fake.size(4)
+                        to_save_fake = to_save_fake.view(-1, to_save_fake.size(2), to_save_fake.size(3), to_save_fake.size(4))
+                        path = '%s/fake_samples_epoch_%03d_iter_%06d_%dx%d.png' % (params.out_samples, epoch, iteration, h, w)
+
+                        vutils.save_image(to_save_fake, path, normalize=True, nrow=num_frames_fake)
 
                     if cond is not None:
                         with open('%s/sentences_epoch%03d_iter_%06d.txt' % (params.out_samples, epoch, iteration), 'w') as out_f:

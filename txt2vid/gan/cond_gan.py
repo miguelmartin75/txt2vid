@@ -49,6 +49,7 @@ class CondGan(object):
             if fake is not None and real_cond is not None:
                 fake_cc = discrim(x=fake, cond=real_cond, xbar=fake_mapping)
 
+            # TODO
             fake_pred = torch.cat((real_ic, fake_cc), dim=-1)
         else:
             if fake is not None:
@@ -56,8 +57,11 @@ class CondGan(object):
 
         l = None
         if loss is not None and fake_pred is not None and real_pred is not None:
-            l = loss(fake=fake_pred, real=real_pred)
-            # TODO remove from here
+            losses = [ loss(fake=f, real=r) for f, r in zip(fake_pred, real_pred) ]
+            losses = torch.stack(losses)
+            l = losses.mean()
+
+            # TODO potentially move this elsewhere
             if gp_lambda > 0:
                 gp = gradient_penalty(discrim, 
                                       real_x=real, 
@@ -83,7 +87,10 @@ class CondGan(object):
         losses = []
         for r, name, discrim in zip(real_pred, self.discrim_names, self.discrims):
             f = discrim(x=fake, cond=cond, xbar=fake_mapping)
-            losses.append(loss(fake=f, real=r))
+            temp = []
+            for ff, rr in zip(f, r):
+                temp.append(loss(fake=ff, real=rr))
+            losses.append(torch.stack(temp).mean())
 
         return self._discrim_weighted_sum(torch.stack(losses))
     
@@ -100,7 +107,8 @@ class CondGan(object):
             real_cond = cond
             fake_cond = cond
             if cond is not None:
-                fake_cond = real_cond[gen_perm(real_cond.size(0))]
+                perm = gen_perm(real_cond[0].size(0))
+                fake_cond = [ r[perm[0:r.size(0)]] for r in real_cond ]
 
             l, f, r = self.discrim_forward(name=name, 
                                            discrim=discrim,

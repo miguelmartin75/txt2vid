@@ -58,6 +58,7 @@ class Gen(nn.Module):
             z_slow = torch.cat((z_slow, cond), dim=-1)
 
         z_fast = self._fsgen(z_slow)
+        print("z_fast=", z_fast.size())
 
         B, n_z_fast, n_frames = z_fast.size()
         z_fast = z_fast.permute(0, 2, 1).contiguous().view(B * n_frames, n_z_fast) #squash time dimension in batch dimension
@@ -66,6 +67,8 @@ class Gen(nn.Module):
         z_slow = z_slow.unsqueeze(1).repeat(1, n_frames, 1)
         z_slow = z_slow.contiguous().view(B * n_frames, n_z_slow)
 
+        print(z_slow.size())
+        print(z_fast.size())
         out = self._vgen(z_slow, z_fast)
         out = out.view(B, n_frames, self.out_channels, 64, 64)
         return out.permute(0, 2, 1, 3, 4)

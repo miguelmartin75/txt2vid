@@ -6,7 +6,7 @@ from txt2vid.models.resnet3d import Resnet3D
 
 class MultiScaleDiscrim(nn.Module):
 
-    def __init__(self, discrim_down_blocks=[3, 3, 4, 4], num_channels=3, cond_dim=0, underlying_discrim=Resnet3D):
+    def __init__(self, discrim_down_blocks=[4, 4, 4, 4], num_channels=3, cond_dim=0, underlying_discrim=Resnet3D):
         super().__init__()
 
         self.sub_discrims = []
@@ -25,11 +25,11 @@ class MultiScaleDiscrim(nn.Module):
         return out
 
 if __name__ == '__main__':
-    batch_size = 32
+    batch_size = 1
     latent_size = 256
     device = 'cuda:0'
     from txt2vid.models.tganv2.gen import MultiScaleGen
-    gen = MultiScaleGen(latent_size=latent_size, width=64, height=64).to(device)
+    gen = MultiScaleGen(latent_size=latent_size, width=256, height=256).to(device)
     z = torch.randn(batch_size, latent_size).to(device)
     z = gen(z)
 

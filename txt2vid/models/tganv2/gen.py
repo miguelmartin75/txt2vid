@@ -21,7 +21,7 @@ class BaseFrameGen(nn.Module):
 
 class MultiScaleGen(nn.Module):
 
-    def __init__(self, latent_size=256, width=64, height=64, num_channels=3, additional_blocks=[64, 32, 32], fm_channels=1024, num_frames=16, cond_dim=0):
+    def __init__(self, latent_size=256, width=128, height=128, num_channels=3, additional_blocks=[64, 32, 32], fm_channels=1024, num_frames=16, cond_dim=0):
         super().__init__()
 
         self.subsample = Subsample()
@@ -31,8 +31,9 @@ class MultiScaleGen(nn.Module):
         self.fm_channels = fm_channels
         self.fm_width = max(1, (width // 64))
         self.fm_height = max(1, (height // 64))
-        self.latent_plane_ch = self.latent_size
-        #self.latent_plane_ch = self.fm_channels
+
+        #self.latent_plane_ch = self.latent_size
+        self.latent_plane_ch = self.fm_channels
         self.fm_size = self.fm_width * self.fm_height * self.latent_plane_ch
         self.fc = nn.Linear(latent_size, self.fm_size)
 
@@ -57,7 +58,7 @@ class MultiScaleGen(nn.Module):
         from torch.nn.parallel import data_parallel
 
         x = self.fc(x)
-        x = x.view(x.size(0), self.latent_size, self.fm_height, self.fm_width)
+        x = x.view(x.size(0), self.latent_plane_ch, self.fm_height, self.fm_width)
         x, _ = self.clstm(x)
         num_frames = len(x)
 
@@ -115,24 +116,20 @@ if __name__ == '__main__':
     batch_size = 2
     latent_size=256
     device = 'cuda:0'
-    gen = MultiScaleGen(latent_size=latent_size, width=64, height=64, num_channels=1).to(device)
+    gen = MultiScaleGen(latent_size=latent_size, width=192, height=192, num_channels=3).to(device)
     from txt2vid.util.torch.init import init
     print(gen)
     init(gen, 'xavier')
     z = torch.randn(batch_size, latent_size).to(device)
     
     #print("Before render")
-    #rendered = gen(z)
+    rendered = gen(z)
     #print("After render")
 
     #for i, a in enumerate(abstract):
     #    print('abstract', i, a.size())
-    #for i, r in enumerate(rendered):
-    #    print('rendered', i, r.size())
-
-    #gen.eval()
-    #rendered = gen(z)
-    #print(rendered.size())
+    for i, r in enumerate(rendered):
+        print('rendered', i, r.size())
 
     from txt2vid.util.misc import count_params
     print("Num params = %d" % count_params(gen))

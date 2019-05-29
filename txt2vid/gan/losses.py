@@ -40,8 +40,9 @@ class LabelledGanLoss(object):
 
 class VanillaGanLoss(LabelledGanLoss):
 
-    def __init__(self, bce_loss=True):
-        loss = nn.BCEWithLogitsLoss() if bce_loss else nn.CrossEntropyLoss()
+    # TODO: change default back to mean?
+    def __init__(self, bce_loss=True, reduction='mean'):
+        loss = nn.BCEWithLogitsLoss(reduction=reduction) if bce_loss else nn.CrossEntropyLoss(reduction=reduction)
         super().__init__(underlying_loss=loss, real_label=1, fake_label=0)
 
 class HingeGanLoss(LabelledGanLoss):

@@ -28,7 +28,7 @@ def init(model, init_method=None):
 
     init_func = None
     if init_method == 'xavier':
-        init_func = tinit.xavier_uniform_
+        init_func = tinit.xavier_normal_
     elif init_method == 'ortho':
         init_func = tinit.orthogonal_
     elif init_method == 'normal':

@@ -207,8 +207,10 @@ def train(gan=None, num_epoch=None, dataset=None, device=None, optD=None, optG=N
             if params.log_period > 0 and iteration % params.log_period == 0:
                 #gc.collect()
                 sys.stdout.flush()
-                status('[%d/%d][%d/%d] Iter %d, Loss_D: %.4f Loss_G: %.4f (%.2fGB used)' % 
-                        (epoch, num_epoch, i, len(dataset), iteration, discrim_loss.get(), gen_loss.get(), torch.cuda.memory_allocated() / (10**9)))
+                status('[%d/%d][%d/%d] Iter %d, Loss_D: %.4f Loss_G: %.4f (%.2fGB used, %.2fGB cached)' % 
+                        (epoch, num_epoch, i, len(dataset), iteration, discrim_loss.get(), gen_loss.get(), torch.cuda.max_memory_allocated() / (10**9), torch.cuda.max_memory_cached() / (10**9)))
+                torch.cuda.reset_max_memory_allocated()
+                torch.cuda.reset_max_memory_cached()
 
             if params.save_example_period > 0:
                 if (iteration == 1 and params.save_initial_examples) or iteration % params.save_example_period == 0:

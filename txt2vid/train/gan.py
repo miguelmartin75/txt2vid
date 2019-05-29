@@ -124,6 +124,8 @@ def main(args):
     print("Vocab Size %d" % len(vocab))
     print("Dataset len= %d (%d batches)" % (len(dataset)*args.batch_size, len(dataset)))
 
+    print("GAN has %d parameters (~%.2f * 10^8)" % (gan.count_params(), gan.count_params() / (10**8)))
+
     if args.G_loss is None:
         args.G_loss = args.D_loss
 

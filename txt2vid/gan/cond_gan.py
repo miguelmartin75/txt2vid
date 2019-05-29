@@ -1,4 +1,5 @@
 import torch
+import numpy as np
 
 from txt2vid.util.misc import gen_perm
 from txt2vid.gan.losses import gradient_penalty
@@ -139,6 +140,19 @@ class CondGan(object):
 
         losses, _, _ = self.all_discrim_forward(real=real, fake=fake, cond=cond, loss=loss, gp_lambda=gp_lambda)
         return self._discrim_weighted_sum(torch.stack(losses))
+    
+    def count_params(self):
+        from txt2vid.util.misc import count_params
+        d = np.sum([ count_params(discrim) for discrim in self.discrims ])
+        g = count_params(self.gen)
+        c = 0
+        if self.cond_encoder is not None:
+            c = count_params(self.cond_encoder)
+        s = 0
+        if self.sample_mapping is not None:
+            s = count_params(self.sample_mapping)
+        return d + g + c + s
+
 
     def __call__(self, *args, **kwargs):
         return self.gen(*args, **kwargs)

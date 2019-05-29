@@ -21,7 +21,8 @@ class ResidualBlock(nn.Module):
         def tag_residual(x):
             x.is_residual = True
 
-        self.apply(tag_residual)
+        # apply sqrt(2) factor to residual path
+        self.inner_module.apply(tag_residual)
 
 
     def forward(self, x):
@@ -86,7 +87,7 @@ class SubsampleRect(nn.Module):
 class UpBlock(nn.Module):
 
     # TODO: unpool layer
-    def __init__(self, in_channels=128, out_channels=None, which_bn=nn.BatchNorm2d, which_conv=nn.Conv2d, which_unpool=nn.ConvTranspose2d):
+    def __init__(self, in_channels=128, out_channels=None, which_bn=nn.BatchNorm2d, which_conv=nn.Conv2d, upsample_instead=True, which_unpool=nn.ConvTranspose2d):
         super().__init__()
 
         self.in_channels = in_channels
@@ -94,21 +95,32 @@ class UpBlock(nn.Module):
             out_channels = in_channels
         self.out_channels = out_channels
 
+        mid_ch = self.out_channels
+
+        if upsample_instead:
+            unpool1 = nn.Upsample(scale_factor=2)
+        else:
+            unpool1 = which_unpool(in_channels, in_channels, 2, 2)
+
         main_path = nn.Sequential(
             which_bn(in_channels),
-            nn.ReLU(True),
-            which_unpool(in_channels, in_channels, 2, 2),
-            which_conv(in_channels, in_channels, 3, 1, padding=1, bias=False),
-            which_bn(in_channels),
-            nn.ReLU(True),
-            which_conv(in_channels, out_channels, 3, 1, padding=1, bias=False)
+            nn.ReLU(inplace=False),
+            unpool1,
+            which_conv(in_channels, mid_ch, 3, 1, padding=1),
+            which_bn(mid_ch),
+            nn.ReLU(inplace=False),
+            which_conv(mid_ch, out_channels, 3, 1, padding=1)
         )
 
+
         # note: not using unpool layer
-        identity_map = which_unpool(in_channels, in_channels, 2, 2)
+        if upsample_instead:
+            identity_map = nn.Upsample(scale_factor=2)
+        else:
+            identity_map = which_unpool(in_channels, out_channels, 2, 2)
 
         if out_channels != in_channels:
-            identity_map = nn.Sequential(identity_map, which_unpool(in_channels, out_channels, 1))
+            identity_map = nn.Sequential(identity_map, which_conv(in_channels, out_channels, 1))
 
         self.main = ResidualBlock(inner_module=main_path, identity_map=identity_map)
 
@@ -139,20 +151,23 @@ class DownSample(nn.Module):
 
 class DownBlock(nn.Module):
 
-    def __init__(self, in_channels=3, out_channels=None, which_conv=nn.Conv3d):
+    def __init__(self, in_channels=3, out_channels=None, which_conv=nn.Conv3d, wide=True):
         super().__init__()
 
         if out_channels is None:
             out_channels = in_channels
 
+        mid_ch = out_channels if wide else in_channels
+
         main_path = nn.Sequential(
-            which_conv(in_channels, in_channels, 1, bias=False),
-            nn.ReLU(True),
-            which_conv(in_channels, out_channels, 1, bias=False),
+            nn.ReLU(inplace=False),
+            which_conv(in_channels, mid_ch, kernel_size=3, padding=1),
+            nn.ReLU(inplace=False),
+            which_conv(mid_ch, out_channels, kernel_size=3, padding=1),
             DownSample()
         )
         identity_map = nn.Sequential(
-            which_conv(in_channels, out_channels, 1, bias=False),
+            which_conv(in_channels, out_channels, 1),
             DownSample()
         )
         self.main = ResidualBlock(inner_module=main_path, identity_map=identity_map)
@@ -165,8 +180,8 @@ class RenderBlock(nn.Module):
     def __init__(self, in_channels=128, out_channels=3, which_bn=nn.BatchNorm2d, which_conv=nn.Conv2d):
         super().__init__()
         self.bn = which_bn(in_channels)
-        self.activation = nn.ReLU(True)
-        self.conv = which_conv(in_channels, out_channels, 3, 1, 1, bias=False)
+        self.activation = nn.ReLU()
+        self.conv = which_conv(in_channels, out_channels, kernel_size=3, padding=1)
         self.final = nn.Tanh()
 
     def forward(self, x):
@@ -177,47 +192,52 @@ class RenderBlock(nn.Module):
         return x
 
 if __name__ == '__main__':
-    x = torch.randn(2, 3, 5, 5)
-    subsample = SubsampleRect(width=3, height=2)
-    print(subsample)
-    print(x)
-    x = subsample(x)
-    print(x.size())
-    print(x)
+    #x = torch.randn(2, 3, 5, 5)
+    #subsample = SubsampleRect(width=3, height=2)
+    #print(subsample)
+    #print(x)
+    #x = subsample(x)
+    #print(x.size())
+    #print(x)
 
-    print()
-    print()
+    #print()
+    #print()
 
-    up = UpBlock(in_channels=3, out_channels=10)
-    print(up)
-    x = up(x)
-    print(x.size())
+    #up = UpBlock(in_channels=3, out_channels=10)
+    #print(up)
+    #x = up(x)
+    #print(x.size())
 
-    print()
-    print()
+    #print()
+    #print()
 
-    x = torch.randn(10, 3, 1, 4, 4)
-    ds = DownSample()
-    print('before ds=', x.size())
-    x = ds(x)
-    print('after ds=', x.size())
+    #x = torch.randn(10, 3, 1, 4, 4)
+    #ds = DownSample()
+    #print('before ds=', x.size())
+    #x = ds(x)
+    #print('after ds=', x.size())
 
-    print()
-    print()
+    #print()
+    #print()
 
-    x = torch.randn(10, 3, 16, 100, 100)
-    down = DownBlock(in_channels=3, out_channels=128)
+    x = torch.randn(10, 3, 16, 100, 100).cuda()
+    down = DownBlock(in_channels=3, out_channels=128).cuda()
+    from txt2vid.util.torch.init import init
+
+    init(down, 'xavier')
+
     print(down)
     x = down(x)
     print(x.size())
 
-    print()
-    print()
+    print("num params=", sum(p.numel() for p in down.parameters()))
+    #print()
+    #print()
 
-    x = torch.randn(64, 3, 16, 128, 128)
-    ss = Subsample()
-    print(ss)
-    print('before ss=', x.size())
-    x = ss(x)
-    print('after ss=', x.size())
+    #x = torch.randn(64, 3, 16, 128, 128)
+    #ss = Subsample()
+    #print(ss)
+    #print('before ss=', x.size())
+    #x = ss(x)
+    #print('after ss=', x.size())
 

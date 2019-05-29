@@ -231,7 +231,8 @@ def default_transform(frame_size=None, num_channels=3):
         frame_size.append(frame_size[0])
 
     if num_channels == 3:
-        transform = transforms.Compose([transforms.Resize(frame_size),
+        transform = transforms.Compose([#transforms.CropCenter(int(frame_size*1.25)),
+                                        transforms.Resize(frame_size),
                                         transforms.ToTensor(),
                                         transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
     else:

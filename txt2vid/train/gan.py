@@ -26,6 +26,8 @@ import txt2vid.data as data
 def main(args):
     seed, device = setup(args)
 
+    status("%d cuda devices available" % (torch.cuda.device_count()))
+
     status("Loading vocab from %s" % args.vocab)
     vocab = load(args.vocab)
 

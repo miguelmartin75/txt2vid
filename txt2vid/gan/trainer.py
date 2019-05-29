@@ -207,8 +207,8 @@ def train(gan=None, num_epoch=None, dataset=None, device=None, optD=None, optG=N
             if params.log_period > 0 and iteration % params.log_period == 0:
                 #gc.collect()
                 sys.stdout.flush()
-                status('[%d/%d][%d/%d] Iter %d, Loss_D: %.4f Loss_G: %.4f' % 
-                        (epoch, num_epoch, i, len(dataset), iteration, discrim_loss.get(), gen_loss.get()))
+                status('[%d/%d][%d/%d] Iter %d, Loss_D: %.4f Loss_G: %.4f (%.2fGB used)' % 
+                        (epoch, num_epoch, i, len(dataset), iteration, discrim_loss.get(), gen_loss.get(), torch.cuda.memory_allocated() / (10**9)))
 
             if params.save_example_period > 0:
                 if (iteration == 1 and params.save_initial_examples) or iteration % params.save_example_period == 0:
@@ -246,7 +246,7 @@ def train(gan=None, num_epoch=None, dataset=None, device=None, optD=None, optG=N
 
                             to_save_fake = to_save_fake.permute(0, 2, 1, 3, 4).contiguous()
 
-                        num_frames_fake = to_save_real.size(1)
+                        num_frames_fake = to_save_fake.size(1)
                         h, w = to_save_fake.size(3), to_save_fake.size(4)
                         to_save_fake = to_save_fake.view(-1, to_save_fake.size(2), to_save_fake.size(3), to_save_fake.size(4))
                         path = '%s/fake_samples_epoch_%03d_iter_%06d_%dx%d.png' % (params.out_samples, epoch, iteration, h, w)

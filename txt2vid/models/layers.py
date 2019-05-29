@@ -87,7 +87,7 @@ class SubsampleRect(nn.Module):
 class UpBlock(nn.Module):
 
     # TODO: unpool layer
-    def __init__(self, in_channels=128, out_channels=None, which_bn=nn.BatchNorm2d, which_conv=nn.Conv2d, upsample_instead=True, which_unpool=nn.ConvTranspose2d):
+    def __init__(self, in_channels=128, out_channels=None, which_bn=nn.BatchNorm2d, which_conv=nn.Conv2d, upsample_instead=True, which_unpool=nn.ConvTranspose2d, wide=False):
         super().__init__()
 
         self.in_channels = in_channels
@@ -95,12 +95,12 @@ class UpBlock(nn.Module):
             out_channels = in_channels
         self.out_channels = out_channels
 
-        mid_ch = self.out_channels
+        mid_ch = self.in_channels if wide else self.out_channels
 
-        if upsample_instead:
-            unpool1 = nn.Upsample(scale_factor=2)
-        else:
-            unpool1 = which_unpool(in_channels, in_channels, 2, 2)
+        # not supporting the other way around for now
+        assert(upsample_instead)
+
+        unpool1 = nn.Upsample(scale_factor=2)
 
         main_path = nn.Sequential(
             which_bn(in_channels),
@@ -112,14 +112,9 @@ class UpBlock(nn.Module):
             which_conv(mid_ch, out_channels, 3, 1, padding=1)
         )
 
+        identity_map = nn.Upsample(scale_factor=2)
 
-        # note: not using unpool layer
-        if upsample_instead:
-            identity_map = nn.Upsample(scale_factor=2)
-        else:
-            identity_map = which_unpool(in_channels, out_channels, 2, 2)
-
-        if out_channels != in_channels:
+        if in_channels != out_channels:
             identity_map = nn.Sequential(identity_map, which_conv(in_channels, out_channels, 1))
 
         self.main = ResidualBlock(inner_module=main_path, identity_map=identity_map)

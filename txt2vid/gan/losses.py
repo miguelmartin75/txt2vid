@@ -67,10 +67,23 @@ class WassersteinGanLoss(object):
         #print("fake=", fake.size())
         return -fake.mean()
 
-# Relativistic average Standard GAN (RaSGAN)
+# Relativistic Standard GAN (RSGAN)
 # https://github.com/AlexiaJM/RelativisticGAN
 # https://arxiv.org/pdf/1807.00734.pdf
 # performs best for 1 discrim/1 gen step (speed pls) => with gradient penalty (GP)
+class RSGANLoss(object):
+     
+    def __init__(self, bce_loss=True):
+        self.loss = nn.BCEWithLogitsLoss() if bce_loss else nn.CrossEntropyLoss()
+
+    def discrim_loss(self, fake=None, real=None):
+        y = get_labels_for(fake, 1)
+        return self.loss(real - fake, y)
+
+    def gen_loss(self, fake=None, real=None):
+        y = get_labels_for(fake, 1)
+        return self.loss(fake - real, y)
+
 class RaSGANLoss(object):
      
     def __init__(self, bce_loss=True):

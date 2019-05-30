@@ -1,3 +1,4 @@
+import random
 from pathlib import Path
 
 import numpy as np
@@ -7,6 +8,7 @@ from PIL import Image
 
 import torch
 import torchvision.transforms as transforms
+import torchvision.transforms.functional as F
 import torch.utils.data as data
 
 from txt2vid.util.pick import load
@@ -31,6 +33,31 @@ def read_video_file(video_path, convert_to_pil=True):
         yield frame
 
     video.release()
+
+def pick_frames(from_frames, random=False, num_frames=16):
+    frames = None
+    if not random:
+        new_frames = []
+        factor=int(len(from_frames)/num_frames)
+        i = 0
+        while i < num_frames:
+            new_frames.append(from_frames[factor*i])
+            i += 1
+        frames = new_frames
+    else:
+        assert(len(frames) >= self.random_frames)
+
+        perm = np.random.permutation(range(len(frames)))[0:num_frames]
+        assert(len(perm) == num_frames)
+
+        perm.sort()
+        new_frames = []
+        for i in perm:
+            new_frames.append(from_frames[i])
+        #frames = new_frames
+        assert(len(frames) == self.random_frames)
+    return new_frames
+
 
 class Dataset(data.Dataset):
 
@@ -63,9 +90,6 @@ class Dataset(data.Dataset):
                 self.video_ids.append(vid)
                 self.captions.append(cap)
 
-        #self.video_ids = self.video_ids[0:2]
-        #self.captions = self.captions[0:2]
-
         print("Missing: %d videos" % self.missing)
 
     def __getitem__(self, idx):
@@ -84,34 +108,24 @@ class Dataset(data.Dataset):
 
         frames.sort()
 
-        if self.random_frames == 0:
-            new_frames = []
-            NUM_FRAMES = self.num_frames
-            factor=int(len(frames)/NUM_FRAMES)
-            i = 0
-            while i < NUM_FRAMES:
-                new_frames.append(frames[factor*i])
-                i += 1
-            frames = new_frames
-        else:
-            if len(frames) < self.random_frames:
-                print('Video %s with %d frames' % (self.get_video_path(vid), len(frames)))
+        # IDK why I'm doing it like this lol whatever
+        num_frames = self.random_frames
+        random_frames = True
+        if num_frames == 0:
+            random_frames = False
+            # TODO: remove constant
+            num_frames = 16
 
-            assert(len(frames) >= self.random_frames)
+        frames = pick_frames(frames, random=random_frames, num_frames=num_frames)
 
-            perm = np.random.permutation(range(len(frames)))[0:self.random_frames]
-            assert(len(perm) == self.random_frames)
-
-            perm.sort()
-            new_frames = []
-            for i in perm:
-                new_frames.append(frames[i])
-            frames = new_frames
-            assert(len(frames) == self.random_frames)
+        flip_horiz = random.random() < 0.5
 
         def map_frame(path):
             path = '%s/%s.jpg' % (cache, path)
             img = Image.open(path)
+            if flip_horiz:
+                img = F.hflip(img)
+
             if self.transform:
                 img = self.transform(img)
             return img
@@ -231,12 +245,11 @@ def default_transform(frame_size=None, num_channels=3):
         frame_size.append(frame_size[0])
 
     if num_channels == 3:
-        transform = transforms.Compose([#transforms.CropCenter(int(frame_size*1.25)),
-                                        transforms.Resize(frame_size),
+        transform = transforms.Compose([transforms.CenterCrop(frame_size),
                                         transforms.ToTensor(),
                                         transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
     else:
-        transform = transforms.Compose([transforms.Resize(frame_size),
+        transform = transforms.Compose([transforms.CenterCrop(frame_size),
                                         transforms.Grayscale(),
                                         transforms.ToTensor(),
                                         transforms.Normalize([0.5], [0.5])])

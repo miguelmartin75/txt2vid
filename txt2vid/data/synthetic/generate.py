@@ -231,8 +231,8 @@ if __name__ == '__main__':
     for train, dset, num_examples in zip([True, False], ['train', 'test'], [40000, 10000]):
         objects, object_classes, object_names = load_mnist(train)
 
-        video_out = 'data/synthetic/{}/videos'.format(dset)
-        sent_out = 'data/synthetic/{}/sent.pickle'.format(dset)
+        video_out = '/run/media/doubleu/Linux/synthetic/{}/videos'.format(dset)
+        sent_out = '/run/media/doubleu/Linux/synthetic/{}/sent.pickle'.format(dset)
         print("Generating: %s to %s" % (dset, video_out))
         generate_examples(video_out, 
                           sent_out, 

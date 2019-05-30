@@ -9,7 +9,8 @@ import torchvision.utils as vutils
 
 from txt2vid.util.dir import ensure_exists
 from txt2vid.util.log import status
-from txt2vid.util.metrics import RollingAvgLoss
+from txt2vid.util.metrics import RollingAvg
+from txt2vid.util.stopwatch import Stopwatch
 
 def add_params_to_parser(parser):
     parser.add_argument('--data_is_imgs', action='store_true', default=False, help='is the data images? If not, assume it is videos')
@@ -52,9 +53,6 @@ def train(gan=None, num_epoch=None, dataset=None, device=None, optD=None, optG=N
 
     ensure_exists(params.out)
     ensure_exists(params.out_samples)
-
-    gen_loss = RollingAvgLoss(window_size=params.loss_window_size)
-    discrim_loss = RollingAvgLoss(window_size=params.loss_window_size)
 
     writer = None
     if params.use_writer:
@@ -101,12 +99,26 @@ def train(gan=None, num_epoch=None, dataset=None, device=None, optD=None, optG=N
             return xs, None
 
         return xs, conds
+    
+    iteration_watch = Stopwatch()
+    data_watch = Stopwatch()
+
+    avg_iter = RollingAvg(window_size=params.loss_window_size)
+    avg_data = RollingAvg(window_size=params.loss_window_size)
+    gen_loss = RollingAvg(window_size=params.loss_window_size)
+    discrim_loss = RollingAvg(window_size=params.loss_window_size)
 
     for epoch in range(num_epoch):
         if params.log_period > 0:
             status('Epoch %d started' % (epoch + 1))
 
+        data_watch.start()
         for i, data in enumerate(dataset):
+            data_watch.stop()
+            avg_data.update(data_watch.elapsed_time)
+
+            iteration_watch.start()
+
             iteration = epoch*len(dataset) + i + 1
 
             x = data[0].to(device)
@@ -206,9 +218,12 @@ def train(gan=None, num_epoch=None, dataset=None, device=None, optD=None, optG=N
             
             if params.log_period > 0 and iteration % params.log_period == 0:
                 #gc.collect()
+                iter_per_sec = avg_iter.get()
+                data_per_sec = avg_data.get()
+
                 sys.stdout.flush()
-                status('[%d/%d][%d/%d] Iter %d, Loss_D: %.4f Loss_G: %.4f (%.2fGB used, %.2fGB cached)' % 
-                        (epoch, num_epoch, i, len(dataset), iteration, discrim_loss.get(), gen_loss.get(), torch.cuda.max_memory_allocated() / (10**9), torch.cuda.max_memory_cached() / (10**9)))
+                status('[%d/%d][%d/%d] Iter %d, Loss_D: %.4f Loss_G: %.4f (%.2fGB used, %.2fGB cached) -- [%.4f iter/sec, %.4f batch/sec]' % 
+                        (epoch, num_epoch, i, len(dataset), iteration, discrim_loss.get(), gen_loss.get(), torch.cuda.max_memory_allocated() / (10**9), torch.cuda.max_memory_cached() / (10**9), iter_per_sec, data_per_sec))
                 torch.cuda.reset_max_memory_allocated()
                 torch.cuda.reset_max_memory_cached()
 
@@ -269,3 +284,8 @@ def train(gan=None, num_epoch=None, dataset=None, device=None, optD=None, optG=N
 
 
                     del to_save_fake
+
+            iteration_watch.stop()
+            avg_iter.update(iteration_watch.elapsed_time)
+            data_watch.start()
+

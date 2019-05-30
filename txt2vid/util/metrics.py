@@ -1,25 +1,23 @@
 import collections
 
-class RollingAvgLoss:
+class RollingAvg:
 
     def __init__(self, window_size=100):
         self.window_size = window_size
-        self.loss_window = collections.deque()
+        self.window = collections.deque()
         #self.cumsum = 0.0
 
-    def update(self, loss):
-        self.loss_window.append(loss)
+    def update(self, x):
+        self.window.append(x)
         #self.cumsum += loss
-        if len(self.loss_window) > self.window_size:
+        if len(self.window) > self.window_size:
             #self.cumsum -= self.loss_window[0]
-            temp = self.loss_window[0]
-            self.loss_window.popleft()
+            temp = self.window[0]
+            self.window.popleft()
             del temp
 
     def get(self):
-        assert len(self.loss_window) != 0
-        assert len(self.loss_window) <= self.window_size
+        assert len(self.window) != 0
+        assert len(self.window) <= self.window_size
 
-        avg = sum(self.loss_window) / len(self.loss_window)
-        return avg
-
+        return sum(self.window) / len(self.window)

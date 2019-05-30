@@ -94,13 +94,20 @@ def main(args):
         optG = optim.Adam(G_params, lr=args.G_lr, betas=(args.G_beta1, args.G_beta2))
 
     if args.weights is not None:
+        status("Loading weights from %s" % args.weights)
         to_load = torch.load(args.weights)
 
         gan.load_from_dict(to_load)
         if 'optD' in to_load:
+            status("Loading discrim optimizer")
             optD.load_state_dict(to_load['optD'])
         if 'optG' in to_load:
+            status("Loading gen optimizer")
             optG.load_state_dict(to_load['optG'])
+
+        del to_load
+        to_load = None
+        torch.cuda.empty_cache()
 
     status('Loading data from %s' % args.data)
 

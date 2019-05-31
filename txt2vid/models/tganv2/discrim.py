@@ -6,13 +6,19 @@ from txt2vid.models.resnet3d import Resnet3D
 
 class MultiScaleDiscrim(nn.Module):
 
-    def __init__(self, discrim_down_blocks=[4, 4, 4, 4], num_channels=3, cond_dim=0, underlying_discrim=Resnet3D):
+    def __init__(self, discrim_down_blocks=[4, 4, 4, 4], num_channels=3, cond_dim=0, underlying_discrim=Resnet3D, single_discrim=True):
         super().__init__()
 
         self.sub_discrims = []
-        for db in discrim_down_blocks:
-            self.sub_discrims.append(underlying_discrim(cond_dim=cond_dim, num_down_blocks=db))
-        self.sub_discrims = nn.ModuleList(self.sub_discrims)
+        if single_discrim:
+            self.single_discrim = underlying_discrim(cond_dim=cond_dim, num_down_blocks=discrim_down_blocks[-1], num_channels=num_channels)
+            self.sub_discrims = [ self.single_discrim for i in range(len(discrim_down_blocks)) ]
+        else:
+            self.sub_discrims = []
+            self.single_discrim = None
+            for db in discrim_down_blocks:
+                self.sub_discrims.append(underlying_discrim(cond_dim=cond_dim, num_down_blocks=db, num_channels=num_channels))
+            self.sub_discrims = nn.ModuleList(self.sub_discrims)
 
     def forward(self, x=None, cond=None, xbar=None):
         # TODO: cond

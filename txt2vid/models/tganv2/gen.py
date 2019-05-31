@@ -21,7 +21,7 @@ class BaseFrameGen(nn.Module):
 
 class MultiScaleGen(nn.Module):
 
-    def __init__(self, latent_size=256, width=128, height=128, num_channels=3, additional_blocks=[64, 32, 32], fm_channels=1024, num_frames=16, cond_dim=0):
+    def __init__(self, latent_size=256, width=64, height=64, num_channels=3, additional_blocks=[64, 32, 32], fm_channels=1024, num_frames=16, cond_dim=0):
         super().__init__()
 
         self.subsample = Subsample()

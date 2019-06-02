@@ -41,6 +41,65 @@ def add_params_to_parser(parser):
     # TODO: just allow custom datasets in main
     return parser
 
+def test(gan=None, num_samples=1, dataset=None, device=None, params=None, channel_first=True):
+    ensure_exists(params.out_samples)
+
+    gan.gen.eval()
+    for i in range(num_samples):
+        for j, data in enumerate(dataset):
+            batch_size = data[0].size(0)
+
+            y = [ a.to(device) if isinstance(a, torch.Tensor) else a for a in data[1:] ]
+
+            cond = None
+            if gan.cond_encoder is not None and len(y) >= 2:
+                _, _, cond = gan.cond_encoder.encode(y[0], y[1])
+                if not end2end:
+                    cond = cond.detach()
+
+            z = torch.randn(batch_size, gan.gen.latent_size, device=device)
+            if True:
+                fake = gan(z, cond=cond, output_blocks=None)
+            else:
+                fake = gan(z, cond=cond, output_blocks=range(4))
+
+            if cond is not None:
+                path = '%s/sentences_%d_%d.txt' % (params.out_samples, i, j)
+                save_sentences(y[0], path=path)
+
+            for f in fake:
+                if params.img_model:
+                    h, w = f.size(2), f.size(3)
+                else:
+                    h, w = f.size(3), f.size(4)
+                path = '%s/%d_%d_%dx%d.jpg' % (params.out_samples, i, j, h, w)
+                status("saving to %s" % path)
+                save_frames(f, path=path, channel_first=channel_first, is_images=params.img_model)
+
+            break
+
+def save_frames(frames, path=None, channel_first=True, is_images=False):
+    if channel_first:
+        if is_images:
+            frames = frames.unsqueeze(2)
+        frames = frames.permute(0, 2, 1, 3, 4).contiguous()
+
+    num_frames = frames.size(1)
+    output = frames.view(-1, frames.size(2), frames.size(3), frames.size(4))
+
+    vutils.save_image(output, path, normalize=True, nrow=num_frames)
+
+def save_sentences(captions, path=None):
+    for cap in y[0]:
+        words = None
+        try:
+            words = vocab.to_words(cap)
+        except:
+            words = cap
+
+        out_f.write(words)
+        out_f.write('\n')
+
 # TODO: generalise
 def train(gan=None, num_epoch=None, dataset=None, device=None, optD=None, optG=None, params=None, vocab=None, losses=None, channel_first=True, end2end=True):
     if params.debug:
@@ -237,40 +296,15 @@ def train(gan=None, num_epoch=None, dataset=None, device=None, optD=None, optG=N
                     # for now this is fine
                     status('saving to %s (iteration %d)' % (params.out_samples, iteration))
 
-                    if channel_first:
-                        if params.img_model:
-                            to_save_real = to_save_real.unsqueeze(2)
-                        to_save_real = to_save_real.permute(0, 2, 1, 3, 4).contiguous()
-
-                    num_frames_real = to_save_real.size(1)
-                    to_save_real = to_save_real.view(-1, to_save_real.size(2), to_save_real.size(3), to_save_real.size(4))
-                    vutils.save_image(to_save_real, '%s/real_samples.png' % params.out_samples, normalize=True, nrow=num_frames_real)
+                    save_frames(to_save_real, '%s/real_samples.png' % params.out_samples, is_images=params.img_model)
 
                     for to_save_fake in fake:
-                        if channel_first:
-                            if params.img_model:
-                                to_save_fake = to_save_fake.unsqueeze(2)
-
-                            to_save_fake = to_save_fake.permute(0, 2, 1, 3, 4).contiguous()
-
-                        num_frames_fake = to_save_fake.size(1)
-                        h, w = to_save_fake.size(3), to_save_fake.size(4)
-                        to_save_fake = to_save_fake.view(-1, to_save_fake.size(2), to_save_fake.size(3), to_save_fake.size(4))
+                        h, w = to_save_fake.size(2), to_save_fake.size(3)
                         path = '%s/fake_samples_epoch_%03d_iter_%06d_%dx%d.png' % (params.out_samples, epoch, iteration, h, w)
-
-                        vutils.save_image(to_save_fake, path, normalize=True, nrow=num_frames_fake)
+                        save_frames(to_save_fake, path=path, channel_first=channel_first, is_images=params.img_model)
 
                     if cond is not None:
-                        with open('%s/sentences_epoch%03d_iter_%06d.txt' % (params.out_samples, epoch, iteration), 'w') as out_f:
-                            for cap in y[0]:
-                                words = None
-                                try:
-                                    words = vocab.to_words(cap)
-                                except:
-                                    words = cap
-
-                                out_f.write(words)
-                                out_f.write('\n')
-
+                        path = '%s/sentences_epoch%03d_iter_%06d.txt' % (params.out_samples, epoch, iteration)
+                        save_sentences(y[0], path=path)
 
                     del to_save_fake

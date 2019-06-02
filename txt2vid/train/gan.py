@@ -12,7 +12,7 @@ import torch.utils.data
 from torchvision import transforms
 
 from txt2vid.train.setup import setup
-from txt2vid.gan.trainer import train, add_params_to_parser
+from txt2vid.gan.trainer import test, train, add_params_to_parser
 from txt2vid.gan.losses import MixedGanLoss
 from txt2vid.util.log import status, warn, error
 from txt2vid.util.pick import load
@@ -22,6 +22,8 @@ from txt2vid.util.torch.init import init
 from txt2vid.gan.cond_gan import CondGan
 from txt2vid.data import Vocab
 import txt2vid.data as data
+
+from apex import amp
 
 def main(args):
     seed, device = setup(args)
@@ -74,9 +76,7 @@ def main(args):
         status("Initialising sample_mapping %s with %s" % (args.M, args.init_method))
         init(sample_mapping, init_method=args.init_method)
 
-    gan = CondGan(gen=gen, discrims=discrims, cond_encoder=txt_encoder, sample_mapping=sample_mapping, discrim_names=args.D_names, discrim_lambdas=args.D_lambdas)
-
-    D_params = [ { "params": p } for p in gan.discrims_params ]
+    D_params = [ { "params": discrim.parameters() } for discrim in discrims ]
     G_params = [ { "params": gen.parameters() } ]
 
     if args.end2end and txt_encoder is not None:
@@ -93,6 +93,8 @@ def main(args):
         optD = optim.Adam(D_params, lr=args.D_lr, betas=(args.D_beta1, args.D_beta2))
         optG = optim.Adam(G_params, lr=args.G_lr, betas=(args.G_beta1, args.G_beta2))
 
+    gan = CondGan(gen=gen, discrims=discrims, cond_encoder=txt_encoder, sample_mapping=sample_mapping, discrim_names=args.D_names, discrim_lambdas=args.D_lambdas)
+
     if args.weights is not None:
         status("Loading weights from %s" % args.weights)
         to_load = torch.load(args.weights)
@@ -108,6 +110,21 @@ def main(args):
         del to_load
         to_load = None
         torch.cuda.empty_cache()
+
+    #models_to_convert = [ gen ]
+
+    #if txt_encoder is not None:
+    #    models_to_convert.append(txt_encoder)
+    #for discrim in discrims:
+    #    models_to_convert.append(discrim)
+    #models_to_convert, [optD, optG] = amp.initialize(models_to_convert, [optD, optG], opt_level=args.opt_level)
+
+    #gen = models_to_convert[0]
+    #if txt_encoder is not None:
+    #    txt_encoder = models_to_convert[1]
+    #    discrims = models_to_convert[2:]
+    #else:
+    #    discrims = models_to_convert[1:]
 
     status('Loading data from %s' % args.data)
 
@@ -138,11 +155,17 @@ def main(args):
 
     losses = MixedGanLoss(g_loss=create_object(args.G_loss), d_loss=create_object(args.D_loss))
 
-    train(gan=gan, num_epoch=args.epochs, dataset=dataset, device=device, optD=optD, optG=optG, params=args, losses=losses, vocab=vocab, channel_first=not args.sequence_first, end2end=args.end2end)
+    if args.test:
+        test(gan=gan, num_samples=args.num_samples, dataset=dataset, device=device, params=args, channel_first=not args.sequence_first)
+    else:
+        train(gan=gan, num_epoch=args.epochs, dataset=dataset, device=device, optD=optD, optG=optG, params=args, losses=losses, vocab=vocab, channel_first=not args.sequence_first, end2end=args.end2end)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     add_params_to_parser(parser)
+
+    parser.add_argument('--test', action='store_true', help='enables cuda')
+    parser.add_argument('--num_samples', type=int, default=1, help='number of samples to produce')
 
     # General setup stuff
     parser.add_argument('--seed', type=int, default=None, help='Seed to use')
@@ -156,6 +179,8 @@ if __name__ == '__main__':
     parser.add_argument('--random_frames', type=int, default=0, help='use random frames')
 
     # Training params
+    parser.add_argument('--opt_level', type=str, default='O2', help='optimisation level for AMP')
+
     parser.add_argument('--epochs', type=int, default=5, help='number of epochs to perform')
     parser.add_argument('--batch_size', type=int, default=64, help='input batch size')
     parser.add_argument('--init_method', type=str, default='xavier', help='method for initialisation')

@@ -155,10 +155,13 @@ def train(gan=None, num_epoch=None, dataset=None, device=None, optD=None, optG=N
 
     gen_loss = RollingAvg(window_size=params.loss_window_size)
     discrim_loss = RollingAvg(window_size=params.loss_window_size)
-    avg_data_load = RollingAvg(window_size=params.loss_window_size)
-    avg_iter = RollingAvg(window_size=params.loss_window_size)
+    avg_data_load = RollingAvg(window_size=params.log_period)
+    avg_iter = RollingAvg(window_size=params.log_period)
     data_load_watch = Stopwatch()
     iter_watch = Stopwatch()
+
+    from txt2vid.data import data_prefetcher
+    prefetcher = data_prefetcher(dataset)
 
     for epoch in range(num_epoch):
         if params.log_period > 0:
@@ -167,11 +170,16 @@ def train(gan=None, num_epoch=None, dataset=None, device=None, optD=None, optG=N
         # TODO: remove
         data_load_watch.start()
         iter_watch.start()
-        for i, data in enumerate(dataset):
+
+        i = 0
+        x, y = prefetcher.next()
+
+        #for i, data in enumerate(dataset):
+        while x is not None:
             iteration = epoch*len(dataset) + i + 1
 
-            x = data[0].to(device)
-            y = [ a.to(device) if isinstance(a, torch.Tensor) else a for a in data[1:] ]
+            #x = data[0].to(device)
+            #y = [ a.to(device) if isinstance(a, torch.Tensor) else a for a in data[1:] ]
 
             data_load_watch.stop()
             avg_data_load.update(data_load_watch.elapsed_time)
@@ -253,7 +261,7 @@ def train(gan=None, num_epoch=None, dataset=None, device=None, optD=None, optG=N
             
             if params.log_period > 0 and iteration % params.log_period == 0:
                 sys.stdout.flush()
-                desc = '[%d/%d; %d/%d] - Iter %d, Loss_D: %.4f Loss_G: %.4f (%.2fGB used; %.2fGB cached) - %.4f sec/iter; %.4f batch load/sec' % (epoch, num_epoch, i, len(dataset), iteration, discrim_loss.get(), gen_loss.get(), torch.cuda.max_memory_allocated() / (10**9), torch.cuda.max_memory_cached() / (10**9), avg_iter.get(), avg_data_load.get())
+                desc = '[%d/%d; %d/%d] - Iter %d, Loss_D: %.4f Loss_G: %.4f (%.2fGB used; %.2fGB cached) - %.4f sec/iter; %.4f sec/batch load' % (epoch, num_epoch, i, len(dataset), iteration, discrim_loss.get(), gen_loss.get(), torch.cuda.max_memory_allocated() / (10**9), torch.cuda.max_memory_cached() / (10**9), avg_iter.get(), avg_data_load.get())
                 status(desc)
                 #pbar.set_description(desc)
 
@@ -301,3 +309,6 @@ def train(gan=None, num_epoch=None, dataset=None, device=None, optD=None, optG=N
             iter_watch.stop()
             avg_iter.update(iter_watch.elapsed_time)
             iter_watch.start()
+
+            x, y = prefetcher.next()
+            i += 1

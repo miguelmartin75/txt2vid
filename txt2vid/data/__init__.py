@@ -128,6 +128,33 @@ def pick_frames(from_frames, random=False, num_frames=16):
         assert(len(frames) == self.random_frames)
     return new_frames
 
+class data_prefetcher():
+    def __init__(self, loader):
+        self.loader = iter(loader)
+        self.stream = torch.cuda.Stream()
+        self.preload()
+
+    def preload(self):
+        try:
+            data = next(self.loader)
+            self.next_input = data[0]
+            self.next_target = data[1:]
+        except StopIteration:
+            self.next_input = None
+            self.next_target = None
+            return
+        with torch.cuda.stream(self.stream):
+            self.next_input = self.next_input.cuda(non_blocking=True)
+            self.next_target = [ a.cuda(non_blocking=True) if isinstance(a, torch.Tensor) else a for a in self.next_target ]
+            self.next_input = self.next_input.float()
+
+    def next(self):
+        torch.cuda.current_stream().wait_stream(self.stream)
+        input = self.next_input
+        target = self.next_target
+        self.preload()
+        return input, target
+
 class Dataset(data.Dataset):
 
     def get_video_path(self, vid_id):
@@ -154,6 +181,7 @@ class Dataset(data.Dataset):
         if use_lmdb:
             import lmdb
             self.env = lmdb.open(video_dir + '.lmdb', readonly=True)
+            self.txn = self.env.begin()
 
         for vid in captions:
             try:
@@ -177,8 +205,8 @@ class Dataset(data.Dataset):
 
         if self.use_lmdb:
             # This is NOT fast
-            with self.env.begin() as txn:
-                raw_datum = txn.get(vid.encode())
+            #with self.env.begin() as txn:
+            raw_datum = self.txn.get(vid.encode())
             from txt2vid.data.create_cache import get_frames
             frames = get_frames(raw_datum)
             frames = torch.Tensor(frames)
@@ -351,9 +379,9 @@ def my_dataset(data=None, vocab=None, anno=None, transform=None, random_frames=F
 
 def get_loader(dset=None, batch_size=64, val=False, num_workers=4, has_captions=False):
     if has_captions:
-        return torch.utils.data.DataLoader(dataset=dset, batch_size=batch_size, shuffle=not val, num_workers=num_workers, collate_fn=collate_fn)
+        return torch.utils.data.DataLoader(dataset=dset, batch_size=batch_size, shuffle=not val, num_workers=num_workers, collate_fn=collate_fn, pin_memory=True)
     else:
-        return torch.utils.data.DataLoader(dataset=dset, batch_size=batch_size, shuffle=not val, num_workers=num_workers)
+        return torch.utils.data.DataLoader(dataset=dset, batch_size=batch_size, shuffle=not val, num_workers=num_workers, pin_memory=True)
 
 def main(args):
     ex_to_sent = load(args.sents)

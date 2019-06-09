@@ -8,8 +8,9 @@ import numpy as np
 from txt2vid.data import read_video_file, to_pil
 
 def get_videos(directory):
+    valid_suffixes = [ '.avi', '.mp4', '.gif', '.webm' ]
     for video in directory.iterdir():
-        if video.suffix != '.avi':
+        if not video.suffix in valid_suffixes:
             continue
         yield video
 
@@ -18,25 +19,42 @@ def resize(frame, frame_size):
 
 def get_all_frames(video_dir):
     videos = list(get_videos(video_dir))
+    videos.sort()
 
+    from txt2vid.data.reddit_videos_json_to_pickle import from_path_to_key
     for video in tqdm.tqdm(videos):
-        vid = video.stem
-        sys.stdout.flush()
+        vid = from_path_to_key(video)
 
         frames = []
         for idx, frame in enumerate(read_video_file(video, convert_to_pil=False)):
             frame = resize(frame, args.frame_size)
             frames.append(frame)
 
+        if len(frames) == 0:
+            continue
+
         yield vid, frames
 
         for frame in frames:
             del frame
 
+def get_frames(raw_datum, frame_size=128, mean=.5, std=.5):
+    tensor_protos = caffe2_pb2.TensorProtos()
+    tensor_protos.ParseFromString(raw_datum)
+
+    data = tensor_protos.protos[0].int32_data
+    data = data.reshape(16, 3, frame_size, frame_size)
+    #data = data*.5
+    return data
+
 def main(args):
     video_dir = Path(args.dir)
 
     if args.lmdb is not None:
+        if args.sent is not None:
+            from txt2vid.util.pick import load
+            sent = load(args.sent)
+
         # https://github.com/pytorch/pytorch/blob/master/caffe2/python/examples/lmdb_create_example.py
         from caffe2.proto import caffe2_pb2
         from caffe2.python import workspace, model_helper
@@ -53,31 +71,35 @@ def main(args):
                 # TODO: configure
                 from txt2vid.data import pick_frames
 
-                mean = 0.5
-                std = 0.5
-                def transform_frame(frame):
-                    frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-                    frame = np.array(frame.transpose(2, 0, 1), dtype=np.float32)
-                    for ch in range(frame.shape[0]):
-                        frame[ch] = (frame[ch] - mean) / std
-                    return frame
-
+                # https://github.com/pytorch/pytorch/blob/master/caffe2/proto/caffe2.proto
                 frames = pick_frames(frames, random=False, num_frames=16)
-                frames = [ transform_frame(frame) for frame in frames ]
-
                 frames = np.stack(frames)
+                assert(frames.dtype == np.uint8)
 
                 fixed_vid_tensor = tensor_protos.protos.add()
                 fixed_vid_tensor.dims.extend(frames.shape)
-                fixed_vid_tensor.data_type = 1
+                fixed_vid_tensor.data_type = 8
 
                 flat = frames.reshape(np.prod(frames.shape))
-                fixed_vid_tensor.float_data.extend(flat)
-                txn.put('{}'.format(vid).encode('ascii'), tensor_protos.SerializeToString())
+                fixed_vid_tensor.int32_data.extend(flat)
 
-                checksum += np.sum(frames) 
+               # if args.sent is not None:
+               #     if args.is_labels:
+               #         # TODO
+               #         assert(False)
+               #     else:
+               #         #num_sentences = tensor_protos.protos.add()
+               #         #num_sentences.data_type = 2 
+               #         #num_sentences.int32_data.append(len(sent[vid]))
 
-        print("Checksum/write: {}".format(int(checksum)))
+               #         sentence_tensor = tensor_protos.protos.add()
+               #         sentence_tensor.data_type = 4
+               #         for s in sent[vid]:
+               #             sentence_tensor.string_data.append(s.encode())
+
+                txn.put('{}'.format(vid).encode(), tensor_protos.SerializeToString())
+
+        print("DONE")
 
     else:
         for vid, frames in get_all_frames(video_dir):
@@ -93,6 +115,8 @@ if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument('--dir', type=str, default=None, help='location of videos', required=True)
+    parser.add_argument('--sent', type=str, default=None, help='sentence or label data (if applicable)')
+    parser.add_argument('--is_labels', action='store_true', default=False, help='is `sent` labels? By default it is assumed that `sent` is sentences.')
     parser.add_argument('--frame_size', type=int, default=256, help='size of frame')
     parser.add_argument('--lmdb', type=str, default=None, help='save to LMDB?')
 

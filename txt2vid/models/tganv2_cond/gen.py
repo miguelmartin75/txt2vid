@@ -13,7 +13,7 @@ class BaseFrameGen(nn.Module):
         self.up1 = UpBlock(in_channels=512, out_channels=256)
         self.up2 = UpBlock(in_channels=256, out_channels=out_channels)
 
-    def forward(self, x):
+    def forward(self, x, cond=None):
         x = self.up0(x)
         x = self.up1(x)
         x = self.up2(x)
@@ -21,7 +21,7 @@ class BaseFrameGen(nn.Module):
 
 class MultiScaleGen(nn.Module):
 
-    def __init__(self, latent_size=256, width=128, height=128, num_channels=3, additional_blocks=[64, 32, 32], fm_channels=1024, num_frames=16, cond_dim=0, no_lstm=False):
+    def __init__(self, latent_size=256, width=64, height=64, num_channels=3, additional_blocks=[64, 32, 32], fm_channels=1024, num_frames=16, cond_dim=256, no_lstm=False):
         super().__init__()
 
         self.subsample = Subsample()
@@ -121,12 +121,15 @@ class MultiScaleGen(nn.Module):
 
 if __name__ == '__main__':
     batch_size = 2
-    latent_size=256
+    latent_size = 256
     device = 'cuda:0'
-    gen = MultiScaleGen(latent_size=latent_size, width=192, height=192, num_channels=3).to(device)
+    cond_dim = 50
+    gen = MultiScaleGen(latent_size=latent_size, width=192, height=192, num_channels=3, cond_dim=cond_dim).to(device)
+
     from txt2vid.util.torch.init import init
     print(gen)
     init(gen, 'xavier')
+    cond = torch.randn(batch_size, cond_dim).to(device)
     z = torch.randn(batch_size, latent_size).to(device)
     
     #print("Before render")

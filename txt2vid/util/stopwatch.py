@@ -1,4 +1,4 @@
-from datetime import datetime
+import time
 
 class Stopwatch(object):
 
@@ -8,10 +8,10 @@ class Stopwatch(object):
             self.start()
 
     def start(self):
-        self.t1 = datetime.now()
+        self.t1 = time.time()
 
     def stop(self):
-        self.t2 = datetime.now()
+        self.t2 = time.time()
 
     def reset(self):
         self.t1 = 0
@@ -19,5 +19,4 @@ class Stopwatch(object):
 
     @property
     def elapsed_time(self):
-        diff = self.t2 - self.t1
-        return diff.microseconds / 10**6
+        return self.t2 - self.t1

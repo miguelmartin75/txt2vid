@@ -34,44 +34,55 @@ class CondGan(object):
     def discrim_forward(self, name=None, discrim=None, real=None, real_mapping=None, fake=None, fake_mapping=None, real_cond=None, fake_cond=None, loss=None, gp_lambda=-1):
         fake_pred = None
         real_pred = None
+        l = None
 
         # real, correct captions => should predict "REAL"
-        if real is not None:
-            real_pred = discrim(x=real, cond=real_cond, xbar=real_mapping)
-
         if real_cond is not None and fake_cond is not None:
-            # real, incorrect captions => should predict "FAKE"
-            real_ic = torch.tensor([], device=real_cond.device)
-            if real is not None and fake_cond is not None:
-                real_ic = discrim(x=real, cond=fake_cond, xbar=real_mapping)
-
-            # fake, correct captions => should predict "FAKE"
-            fake_cc = torch.tensor([], device=real_cond.device)
-            if fake is not None and real_cond is not None:
+            # overlap in these real_cc and real_ic (in terms of computation)
+            real_cc = discrim(x=real, cond=real_cond, xbar=real_mapping)
+            real_pred = real_cc
+            if loss is not None:
+                real_ic = discrim(x=real, 
+                                  cond=fake_cond, 
+                                  xbar=real_mapping, 
+                                  computed_features=[ temp[-1] for temp in real_cc ])
                 fake_cc = discrim(x=fake, cond=real_cond, xbar=fake_mapping)
 
-            # TODO
-            fake_pred = torch.cat((real_ic, fake_cc), dim=-1)
+                loss_uncond = [ loss(fake=f[0], real=r[0]) for f, r in zip(fake_cc, real_cc) ]
+                loss_c1 = [ loss(fake=f[1], real=r[1]) for f, r in zip(fake_cc, real_cc) ]
+                loss_c2 = [ loss(fake=f[1], real=r[1]) for f, r in zip(real_ic, real_cc) ]
+
+                loss_uncond = torch.stack(loss_uncond).mean()
+                loss_c1 = torch.stack(loss_c1)
+                loss_c2 = torch.stack(loss_c2)
+
+                loss_cond = (loss_c1.mean() + loss_c2.mean()) / 2
+
+                l = (loss_uncond + loss_cond) / 2.0
         else:
+            if real is not None:
+                real_pred = discrim(x=real, cond=None, xbar=real_mapping)
+                real_pred = [ r[0] for r in real_pred ]
+
             if fake is not None:
                 fake_pred = discrim(x=fake, cond=None, xbar=fake_mapping)
+                fake_pred = [ f[0] for f in fake_pred ]
 
-        l = None
-        if loss is not None and fake_pred is not None and real_pred is not None:
-            losses = [ loss(fake=f, real=r) for f, r in zip(fake_pred, real_pred) ]
-            losses = torch.stack(losses)
-            l = losses.mean()
+            if loss is not None and fake_pred is not None and real_pred is not None:
+                losses = [ loss(fake=f, real=r) for f, r in zip(fake_pred, real_pred) ]
+                losses = torch.stack(losses)
+                l = losses.mean()
 
-            # TODO potentially move this elsewhere
-            if gp_lambda > 0:
-                gp = gradient_penalty(discrim, 
-                                      real_x=real, 
-                                      real_xbar=real_mapping,
-                                      fake_x=fake,
-                                      fake_xbar=fake_mapping,
-                                      real_cond=real_cond,
-                                      fake_cond=fake_cond)
-                l += gp_lambda * gp
+        # TODO potentially move this elsewhere
+        if l is not None and gp_lambda > 0:
+            gp = gradient_penalty(discrim, 
+                                  real_x=real, 
+                                  real_xbar=real_mapping,
+                                  fake_x=fake,
+                                  fake_xbar=fake_mapping,
+                                  real_cond=real_cond,
+                                  fake_cond=fake_cond)
+            l += gp_lambda * gp
                 
         return l, fake_pred, real_pred
 
@@ -87,11 +98,22 @@ class CondGan(object):
 
         losses = []
         for r, name, discrim in zip(real_pred, self.discrim_names, self.discrims):
-            f = discrim(x=fake, cond=cond, xbar=fake_mapping)
-            temp = []
-            for ff, rr in zip(f, r):
-                temp.append(loss(fake=ff, real=rr))
-            losses.append(torch.stack(temp).mean())
+            fake_cc = discrim(x=fake, cond=cond, xbar=fake_mapping)
+            if cond is None:
+                temp = []
+                for ff, rr in zip(fake_cc, r):
+                    temp.append(loss(fake=ff, real=rr))
+                losses.append(torch.stack(temp).mean())
+            else:
+                loss_uncond = [ loss(fake=ff[0], real=rr[0]) for ff, rr in zip(fake_cc, r) ]
+                loss_cond = [ loss(fake=ff[1], real=rr[1]) for ff, rr in zip(fake_cc, r) ]
+
+                loss_uncond = torch.stack(loss_uncond).mean()
+                loss_cond = torch.stack(loss_cond).mean()
+
+                temp = (loss_cond + loss_uncond) / 2.0
+                losses.append(temp)
+
 
         return self._discrim_weighted_sum(torch.stack(losses))
     
@@ -106,10 +128,10 @@ class CondGan(object):
 
         for name, discrim in zip(self.discrim_names, self.discrims):
             real_cond = cond
-            fake_cond = cond
+            fake_cond = None
             if cond is not None:
-                perm = gen_perm(real_cond[0].size(0))
-                fake_cond = [ r[perm[0:r.size(0)]] for r in real_cond ]
+                fake_cond_0 = real_cond[0][gen_perm(real_cond[0].size(0))]
+                fake_cond = [ fake_cond_0[0:r.size(0)] for r in real_cond ]
 
             l, f, r = self.discrim_forward(name=name, 
                                            discrim=discrim,

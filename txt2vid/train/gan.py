@@ -93,6 +93,21 @@ def main(args):
         optD = optim.Adam(D_params, lr=args.D_lr, betas=(args.D_beta1, args.D_beta2))
         optG = optim.Adam(G_params, lr=args.G_lr, betas=(args.G_beta1, args.G_beta2))
 
+    #models_to_convert = [ gen ]
+
+    #if txt_encoder is not None:
+    #    models_to_convert.append(txt_encoder)
+    #for discrim in discrims:
+    #    models_to_convert.append(discrim)
+    #models_to_convert, [optD, optG] = amp.initialize(models_to_convert, [optD, optG], opt_level=args.opt_level)
+
+    #gen = models_to_convert[0]
+    #if txt_encoder is not None:
+    #    txt_encoder = models_to_convert[1]
+    #    discrims = models_to_convert[2:]
+    #else:
+    #    discrims = models_to_convert[1:]
+
     gan = CondGan(gen=gen, discrims=discrims, cond_encoder=txt_encoder, sample_mapping=sample_mapping, discrim_names=args.D_names, discrim_lambdas=args.D_lambdas)
 
     if args.weights is not None:
@@ -110,21 +125,6 @@ def main(args):
         del to_load
         to_load = None
         torch.cuda.empty_cache()
-
-    #models_to_convert = [ gen ]
-
-    #if txt_encoder is not None:
-    #    models_to_convert.append(txt_encoder)
-    #for discrim in discrims:
-    #    models_to_convert.append(discrim)
-    #models_to_convert, [optD, optG] = amp.initialize(models_to_convert, [optD, optG], opt_level=args.opt_level)
-
-    #gen = models_to_convert[0]
-    #if txt_encoder is not None:
-    #    txt_encoder = models_to_convert[1]
-    #    discrims = models_to_convert[2:]
-    #else:
-    #    discrims = models_to_convert[1:]
 
     status('Loading data from %s' % args.data)
 

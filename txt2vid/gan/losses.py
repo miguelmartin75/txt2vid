@@ -152,7 +152,11 @@ def _gradient_penalty(discrim, real_x=None, real_xbar=None, fake_x=None, fake_xb
 
     interpolate_cond = None
     if real_cond is not None and fake_cond is not None:
-        alpha = alpha.squeeze().unsqueeze(1)
+        alpha = alpha.squeeze()
+        if alpha.dim() == 0:
+            alpha = alpha.unsqueeze(0)
+        alpha = alpha.unsqueeze(1)
+
         alpha_cond = alpha.expand_as(real_cond).to(real_cond.device)
         interpolate_cond = alpha_cond * real_cond + ((1 - alpha_cond) * fake_cond)
 
@@ -162,10 +166,16 @@ def _gradient_penalty(discrim, real_x=None, real_xbar=None, fake_x=None, fake_xb
     if interpolate_xbar is not None:
         inputs.append(interpolate_xbar)
 
-    interpolates = discrim(x=interpolate_x, cond=interpolate_cond, xbar=interpolate_xbar)
+    uncond_output, cond_output, _ = discrim(x=interpolate_x, cond=interpolate_cond, xbar=interpolate_xbar)
+
+    outputs = [ uncond_output ]
+    if cond_output is not None:
+        outputs.append(cond_output)
+
+    grad_outputs = [ torch.ones(g.size(), device=g.device) for g in outputs ]
 
     from torch.autograd import grad
-    gradients = grad(outputs=interpolates, inputs=inputs, grad_outputs=torch.ones(interpolates.size(), device=interpolates.device), create_graph=True, retain_graph=True, only_inputs=True)[0]
+    gradients = grad(outputs=outputs, inputs=inputs, grad_outputs=grad_outputs, create_graph=True, retain_graph=True, only_inputs=True)[0]
 
     gradients = gradients.view(batch_size, -1)
 
@@ -183,10 +193,15 @@ def gradient_penalty(discrim, real_x=None, real_xbar=None, fake_x=None, fake_xba
                 rx, rxbar, rcond = real_x[i], None, None
                 fx, fxbar, fcond = fake_x[i], None, None
             else:
+                if real_xbar is None:
+                    real_xbar = [ None ] * len(real_x)
+                    fake_xbar = [ None ] * len(real_x)
+
                 rx, rxbar, rcond = real_x[i], real_xbar[i], real_cond[i]
                 fx, fxbar, fcond = fake_x[i], fake_xbar[i], fake_cond[i]
 
             gp = _gradient_penalty(discrim.sub_discrims[i], real_x=rx, real_xbar=rxbar, real_cond=rcond, fake_x=fx, fake_xbar=fxbar, fake_cond=fcond, zero_center=True, combine=torch.sum)
+            #gp = _gradient_penalty(discrim.sub_discrims[i], real_x=rx, real_xbar=rxbar, real_cond=rcond, fake_x=fx, fake_xbar=fxbar, fake_cond=fcond, zero_center=False, combine=torch.sum)
             gradients.append(gp)
 
         return torch.stack(gradients).sum()

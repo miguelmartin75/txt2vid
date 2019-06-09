@@ -13,6 +13,76 @@ import torch.utils.data as data
 
 from txt2vid.util.pick import load
 
+from nvidia.dali.pipeline import Pipeline
+import nvidia.dali.ops as ops
+import nvidia.dali.types as types
+
+#import nvidia.dali.plugin_manager as plugin_manager
+#plugin_manager.load_library('./dali_custom_ops/build/libmyreader.so')
+
+#class Caffe2Pipeline(Pipeline):
+#    def __init__(self, db_folder=None, resize_size=None, crop_size=None, batch_size=None, num_threads=None, device_id=None, ngpu=None):
+#        super(Caffe2Pipeline, self).__init__(batch_size,
+#                                         num_threads,
+#                                         device_id)
+#        if ngpu is None:
+#            ngpu = torch.cuda.device_count()
+#
+#        self.input = ops.MyReaderOp(path = db_folder, num_shards=ngpu)
+#        #self.decode= ops.nvJPEGDecoder(device = "mixed", output_type = types.RGB)
+#        #self.cmnp = ops.CropMirrorNormalize(device = "gpu",
+#        #                                    output_dtype = types.FLOAT,
+#        #                                    crop = (224, 224),
+#        #                                    image_type = types.RGB,
+#        #                                    mean = [0., 0., 0.],
+#        #                                    std = [1., 1., 1.])
+#        #self.uniform = ops.Uniform(range = (0.0, 1.0))
+#        self.iter = 0
+#
+#    def define_graph(self):
+#        self.videos, self.captions = self.input(name="Reader")
+#        return self.videos, self.captions
+#
+#    def iter_setup(self):
+#        pass
+#
+#
+#class VideoReaderPipeline(Pipeline):
+#    def __init__(self, batch_size, sequence_length, num_threads, device_id, files, crop_size):
+#        super(VideoReaderPipeline, self).__init__(batch_size, num_threads, device_id, seed=12)
+#        self.reader = ops.VideoReader(device="gpu", filenames=files, sequence_length=sequence_length, normalized=False,
+#                                     random_shuffle=True, image_type=types.RGB, dtype=types.UINT8, initial_fill=16)
+#        self.crop = ops.CropCastPermute(device="gpu", crop=crop_size, output_layout=types.NHWC, output_dtype=types.FLOAT)
+#        self.uniform = ops.Uniform(range=(0.0, 1.0))
+#        self.transpose = ops.Transpose(device="gpu", perm=[3, 0, 1, 2])
+#
+#    def define_graph(self):
+#        input = self.reader(name="Reader")
+#        cropped = self.crop(input, crop_pos_x=self.uniform(), crop_pos_y=self.uniform())
+#        output = self.transpose(cropped)
+#        return output
+#
+#class DALILoader():
+#    def __init__(self, batch_size, file_root, sequence_length, crop_size):
+#        container_files = os.listdir(file_root)
+#        container_files = [file_root + '/' + f for f in container_files]
+#        self.pipeline = VideoReaderPipeline(batch_size=batch_size,
+#                                            sequence_length=sequence_length,
+#                                            num_threads=2,
+#                                            device_id=0,
+#                                            files=container_files,
+#                                            crop_size=crop_size)
+#        self.pipeline.build()
+#        self.epoch_size = self.pipeline.epoch_size("Reader")
+#        self.dali_iterator = pytorch.DALIGenericIterator(self.pipeline,
+#                                                         ["data"],
+#                                                         self.epoch_size,
+#                                                         auto_reset=True)
+#    def __len__(self):
+#        return int(self.epoch_size)
+#    def __iter__(self):
+#        return self.dali_iterator.__iter__()
+
 def to_pil(cv2_img):
     cv2_img = cv2.cvtColor(cv2_img, cv2.COLOR_BGR2RGB)
     return Image.fromarray(cv2_img)
@@ -58,16 +128,16 @@ def pick_frames(from_frames, random=False, num_frames=16):
         assert(len(frames) == self.random_frames)
     return new_frames
 
-
 class Dataset(data.Dataset):
 
     def get_video_path(self, vid_id):
-        return '%s/%s.avi' % (self.video_dir, vid_id)
+        return "%s/%s" % (self.video_dir, vid_id)
+        #return '%s/%s.avi' % (self.video_dir, vid_id)
 
     def get_cache_video_path(self, vid_id):
         return '%s/%s' % (self.video_dir, vid_id)
 
-    def __init__(self, video_dir=None, vocab=None, captions=None, transform=None, random_frames=0, num_frames=16):
+    def __init__(self, video_dir=None, vocab=None, captions=None, transform=None, random_frames=0, num_frames=16, use_lmdb=False):
         self.video_dir = video_dir
         self.transform = transform
         self.random_frames = random_frames
@@ -80,9 +150,18 @@ class Dataset(data.Dataset):
         self.captions = []
         self.missing = 0
 
+        self.use_lmdb = use_lmdb
+        if use_lmdb:
+            import lmdb
+            self.env = lmdb.open(video_dir + '.lmdb', readonly=True)
+
         for vid in captions:
-            path = Path(self.get_video_path(vid))
-            if not path.exists():
+            try:
+                path = Path(self.get_video_path(vid))
+                if not path.exists():
+                    self.missing += 1
+                    continue
+            except:
                 self.missing += 1
                 continue
 
@@ -96,47 +175,55 @@ class Dataset(data.Dataset):
         vid = str(self.video_ids[idx])
         caption = self.captions[idx]
 
-        cache = Path(self.get_cache_video_path(vid))
-        assert(cache.exists())
-        
-        frames = []
-        for frame_path in cache.iterdir():
-            if frame_path.suffix != '.jpg' and frame_path.suffix != '.png':
-                continue
+        if self.use_lmdb:
+            # This is NOT fast
+            with self.env.begin() as txn:
+                raw_datum = txn.get(vid.encode())
+            from txt2vid.data.create_cache import get_frames
+            frames = get_frames(raw_datum)
+            frames = torch.Tensor(frames)
+        else:
+            cache = Path(self.get_cache_video_path(vid))
+            assert(cache.exists())
+            
+            frames = []
+            for frame_path in cache.iterdir():
+                if frame_path.suffix != '.jpg' and frame_path.suffix != '.png':
+                    continue
 
-            frames.append(int(frame_path.stem))
+                frames.append(int(frame_path.stem))
 
-        frames.sort()
+            frames.sort()
 
-        # IDK why I'm doing it like this lol whatever
-        num_frames = self.random_frames
-        random_frames = True
-        if num_frames == 0:
-            random_frames = False
-            # TODO: remove constant
-            num_frames = 16
+            # IDK why I'm doing it like this lol whatever
+            num_frames = self.random_frames
+            random_frames = True
+            if num_frames == 0:
+                random_frames = False
+                # TODO: remove constant
+                num_frames = 16
 
-        frames = pick_frames(frames, random=random_frames, num_frames=num_frames)
+            frames = pick_frames(frames, random=random_frames, num_frames=num_frames)
 
-        flip_horiz = random.random() < 0.5
+            flip_horiz = random.random() < 0.5
 
-        def map_frame(path):
-            path = '%s/%s.jpg' % (cache, path)
-            img = Image.open(path)
-            if flip_horiz:
-                img = F.hflip(img)
+            def map_frame(path):
+                path = '%s/%s.jpg' % (cache, path)
+                img = Image.open(path)
+                if flip_horiz:
+                    img = F.hflip(img)
 
-            if self.transform:
-                img = self.transform(img)
-            return img
+                if self.transform:
+                    img = self.transform(img)
+                return img
 
-        frames = [ map_frame(path) for path in frames ]
+            frames = [ map_frame(path) for path in frames ]
+            frames = torch.stack(frames)
 
         caption = [self.vocab(token) for token in self.vocab.tokenize(caption)]
         if caption[-1] != self.vocab(self.vocab.END):
             caption.append(self.vocab(self.vocab.END))
 
-        frames = torch.stack(frames)
         caption = torch.Tensor(caption)
         return frames, caption
     
@@ -259,8 +346,8 @@ def cifar10_dataset(data=None, vocab=None, anno=None, transform=None, download=T
     import torchvision.datasets as datasets
     return datasets.CIFAR10(data, transform=transform, download=download)
 
-def mrvdc_dataset(data=None, vocab=None, anno=None, transform=None, random_frames=False, num_frames=16):
-    return Dataset(video_dir=data, vocab=vocab, captions=anno, transform=transform, random_frames=random_frames, num_frames=num_frames)
+def my_dataset(data=None, vocab=None, anno=None, transform=None, random_frames=False, num_frames=16, use_lmdb=False):
+    return Dataset(video_dir=data, vocab=vocab, captions=anno, transform=transform, random_frames=random_frames, num_frames=num_frames, use_lmdb=use_lmdb)
 
 def get_loader(dset=None, batch_size=64, val=False, num_workers=4, has_captions=False):
     if has_captions:

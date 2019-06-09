@@ -58,7 +58,7 @@ def test(gan=None, num_samples=1, dataset=None, device=None, params=None, channe
                     cond = cond.detach()
 
             z = torch.randn(batch_size, gan.gen.latent_size, device=device)
-            if True:
+            if False:
                 fake = gan(z, cond=cond, output_blocks=None)
             else:
                 fake = gan(z, cond=cond, output_blocks=range(4))
@@ -72,7 +72,7 @@ def test(gan=None, num_samples=1, dataset=None, device=None, params=None, channe
                     h, w = f.size(2), f.size(3)
                 else:
                     h, w = f.size(3), f.size(4)
-                path = '%s/%d_%d_%dx%d.jpg' % (params.out_samples, i, j, h, w)
+                path = '%s/%dx%d_%d_%d.jpg' % (params.out_samples, h, w, i, j)
                 status("saving to %s" % path)
                 save_frames(f, path=path, channel_first=channel_first, is_images=params.img_model)
 
@@ -89,16 +89,12 @@ def save_frames(frames, path=None, channel_first=True, is_images=False):
 
     vutils.save_image(output, path, normalize=True, nrow=num_frames)
 
-def save_sentences(captions, path=None):
-    for cap in y[0]:
-        words = None
-        try:
+def save_sentences(captions, path=None, vocab=None):
+    with open(path, 'w') as out_f:
+        for cap in captions:
             words = vocab.to_words(cap)
-        except:
-            words = cap
-
-        out_f.write(words)
-        out_f.write('\n')
+            out_f.write(words)
+            out_f.write('\n')
 
 # TODO: generalise
 def train(gan=None, num_epoch=None, dataset=None, device=None, optD=None, optG=None, params=None, vocab=None, losses=None, channel_first=True, end2end=True):
@@ -143,16 +139,14 @@ def train(gan=None, num_epoch=None, dataset=None, device=None, optD=None, optG=N
             else:
                 resized = x
 
-            #print(i, resized.size())
             xs.append(resized)#.to(device))
+            if cond is not None:
+                conds.append(cond)
 
             if params.subsample_input:
                 x, _ = subsampler(x)
                 if cond is not None:
                     cond = cond[::2]
-
-            if cond is not None:
-                conds.append(cond)
 
         if len(conds) == 0:
             return xs, None
@@ -161,20 +155,26 @@ def train(gan=None, num_epoch=None, dataset=None, device=None, optD=None, optG=N
 
     gen_loss = RollingAvg(window_size=params.loss_window_size)
     discrim_loss = RollingAvg(window_size=params.loss_window_size)
-
-    import tqdm
+    avg_data_load = RollingAvg(window_size=params.loss_window_size)
+    avg_iter = RollingAvg(window_size=params.loss_window_size)
+    data_load_watch = Stopwatch()
+    iter_watch = Stopwatch()
 
     for epoch in range(num_epoch):
         if params.log_period > 0:
             status('Epoch %d started' % (epoch + 1))
 
-        pbar = tqdm.tqdm(dataset)
-
-        for i, data in enumerate(pbar):
+        # TODO: remove
+        data_load_watch.start()
+        iter_watch.start()
+        for i, data in enumerate(dataset):
             iteration = epoch*len(dataset) + i + 1
 
             x = data[0].to(device)
             y = [ a.to(device) if isinstance(a, torch.Tensor) else a for a in data[1:] ]
+
+            data_load_watch.stop()
+            avg_data_load.update(data_load_watch.elapsed_time)
 
             batch_size = x.size(0)
             num_frames = 1
@@ -187,20 +187,6 @@ def train(gan=None, num_epoch=None, dataset=None, device=None, optD=None, optG=N
                 # make it an image
                 # note: assumes x.size(2) == num_frames == 1
                 x = x.squeeze(2)
-
-            #print("Multi-scale =")
-            #for i, d in enumerate(x):
-            #    print(d.size())
-            #    num_frames = d.size(2)
-
-            #    to_save_real = d
-            #    if channel_first:
-            #        to_save_real = to_save_real.permute(0, 2, 1, 3, 4).contiguous()
-            #    to_save_real = to_save_real.view(-1, to_save_real.size(2), to_save_real.size(3), to_save_real.size(4))
-            #    print("saving to", params.out_samples)
-            #    print("d.size=", d.size())
-            #    print("save.size=", to_save_real.size())
-            #    vutils.save_image(to_save_real, '%s/real_samples_%d.png' % (params.out_samples, i), normalize=True, nrow=num_frames) 
 
             cond = None
             if gan.cond_encoder is not None and len(y) >= 2:
@@ -232,8 +218,6 @@ def train(gan=None, num_epoch=None, dataset=None, device=None, optD=None, optG=N
                 optD.step()
                 total_discrim_loss += float(loss)
 
-                # TODO: normalisation step for discrim
-
             discrim_loss.update(float(total_discrim_loss))
 
             _, _, real_pred = gan.all_discrim_forward(real=x, cond=cond, fake=None, loss=None)
@@ -252,7 +236,6 @@ def train(gan=None, num_epoch=None, dataset=None, device=None, optD=None, optG=N
                 optG.step()
 
                 total_g_loss += float(loss)
-                # TODO: normalisation step for gen
 
             gen_loss.update(float(total_g_loss))
 
@@ -270,8 +253,9 @@ def train(gan=None, num_epoch=None, dataset=None, device=None, optD=None, optG=N
             
             if params.log_period > 0 and iteration % params.log_period == 0:
                 sys.stdout.flush()
-                desc = 'Iter %d, Loss_D: %.4f Loss_G: %.4f (%.2fGB used, %.2fGB cached)' % (iteration, discrim_loss.get(), gen_loss.get(), torch.cuda.max_memory_allocated() / (10**9), torch.cuda.max_memory_cached() / (10**9))
-                pbar.set_description(desc)
+                desc = '[%d/%d; %d/%d] - Iter %d, Loss_D: %.4f Loss_G: %.4f (%.2fGB used; %.2fGB cached) - %.4f sec/iter; %.4f batch load/sec' % (epoch, num_epoch, i, len(dataset), iteration, discrim_loss.get(), gen_loss.get(), torch.cuda.max_memory_allocated() / (10**9), torch.cuda.max_memory_cached() / (10**9), avg_iter.get(), avg_data_load.get())
+                status(desc)
+                #pbar.set_description(desc)
 
                 torch.cuda.reset_max_memory_allocated()
                 torch.cuda.reset_max_memory_cached()
@@ -299,12 +283,21 @@ def train(gan=None, num_epoch=None, dataset=None, device=None, optD=None, optG=N
                     save_frames(to_save_real, '%s/real_samples.png' % params.out_samples, is_images=params.img_model)
 
                     for to_save_fake in fake:
-                        h, w = to_save_fake.size(2), to_save_fake.size(3)
+                        if params.img_model:
+                            h, w = f.size(2), f.size(3)
+                        else:
+                            h, w = f.size(3), f.size(4)
                         path = '%s/fake_samples_epoch_%03d_iter_%06d_%dx%d.png' % (params.out_samples, epoch, iteration, h, w)
                         save_frames(to_save_fake, path=path, channel_first=channel_first, is_images=params.img_model)
 
                     if cond is not None:
                         path = '%s/sentences_epoch%03d_iter_%06d.txt' % (params.out_samples, epoch, iteration)
-                        save_sentences(y[0], path=path)
+                        save_sentences(y[0], path=path, vocab=vocab)
 
                     del to_save_fake
+
+            data_load_watch.start()
+
+            iter_watch.stop()
+            avg_iter.update(iter_watch.elapsed_time)
+            iter_watch.start()

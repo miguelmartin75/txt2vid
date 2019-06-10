@@ -161,7 +161,6 @@ def train(gan=None, num_epoch=None, dataset=None, device=None, optD=None, optG=N
     iter_watch = Stopwatch()
 
     from txt2vid.data import data_prefetcher
-    prefetcher = data_prefetcher(dataset)
 
     for epoch in range(num_epoch):
         if params.log_period > 0:
@@ -172,6 +171,8 @@ def train(gan=None, num_epoch=None, dataset=None, device=None, optD=None, optG=N
         iter_watch.start()
 
         i = 0
+
+        prefetcher = data_prefetcher(dataset)
         x, y = prefetcher.next()
 
         #for i, data in enumerate(dataset):
@@ -292,9 +293,9 @@ def train(gan=None, num_epoch=None, dataset=None, device=None, optD=None, optG=N
 
                     for to_save_fake in fake:
                         if params.img_model:
-                            h, w = f.size(2), f.size(3)
+                            h, w = to_save_fake.size(2), to_save_fake.size(3)
                         else:
-                            h, w = f.size(3), f.size(4)
+                            h, w = to_save_fake.size(3), to_save_fake.size(4)
                         path = '%s/fake_samples_epoch_%03d_iter_%06d_%dx%d.png' % (params.out_samples, epoch, iteration, h, w)
                         save_frames(to_save_fake, path=path, channel_first=channel_first, is_images=params.img_model)
 

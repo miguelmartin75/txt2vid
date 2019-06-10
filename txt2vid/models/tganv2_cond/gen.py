@@ -35,7 +35,7 @@ class MultiScaleGen(nn.Module):
         #self.latent_plane_ch = self.latent_size
         self.latent_plane_ch = self.fm_channels
         self.fm_size = self.fm_width * self.fm_height * self.latent_plane_ch
-        self.fc = nn.Linear(latent_size, self.fm_size)
+        self.fc = nn.Linear(latent_size + cond_dim, self.fm_size)
 
         self.no_lstm = no_lstm
         if no_lstm:
@@ -61,6 +61,9 @@ class MultiScaleGen(nn.Module):
 
     def forward(self, x, cond=None, return_abstract_maps=False, output_blocks=None):
         from torch.nn.parallel import data_parallel
+
+        if cond is not None:
+            x = torch.cat((x, cond), dim=1)
 
         x = self.fc(x)
         if not self.no_lstm:
@@ -133,7 +136,7 @@ if __name__ == '__main__':
     z = torch.randn(batch_size, latent_size).to(device)
     
     #print("Before render")
-    rendered = gen(z)
+    rendered = gen(z, cond=cond)
     #print("After render")
 
     #for i, a in enumerate(abstract):

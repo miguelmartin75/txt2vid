@@ -38,12 +38,17 @@ def get_all_frames(video_dir):
         for frame in frames:
             del frame
 
-def get_frames(raw_datum, frame_size=128, mean=.5, std=.5):
+def get_frames(raw_datum, frame_size=128):
+    from caffe2.proto import caffe2_pb2
     tensor_protos = caffe2_pb2.TensorProtos()
     tensor_protos.ParseFromString(raw_datum)
 
+    print('type=', tensor_protos.protos[0].data_type)
     data = tensor_protos.protos[0].int32_data
+    print(data)
     data = data.reshape(16, 3, frame_size, frame_size)
+    data -= 255*.5
+    data /= 255*.5
     #data = data*.5
     return data
 

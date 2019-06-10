@@ -159,7 +159,6 @@ class Dataset(data.Dataset):
 
     def get_video_path(self, vid_id):
         return "%s/%s" % (self.video_dir, vid_id)
-        #return '%s/%s.avi' % (self.video_dir, vid_id)
 
     def get_cache_video_path(self, vid_id):
         return '%s/%s' % (self.video_dir, vid_id)

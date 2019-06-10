@@ -12,7 +12,7 @@ from txt2vid.util.reflection import create_object
 from txt2vid.util.pick import load
 from txt2vid.util.log import status, warn, error
 from txt2vid.util.dir import ensure_exists
-from txt2vid.util.metrics import RollingAvgLoss
+from txt2vid.util.metrics import RollingAvg
 from txt2vid.train.setup import setup
 from txt2vid.models.txt.basic import Seq2Seq
 
@@ -125,6 +125,10 @@ def main(args):
     data.sents = train
     train = data
 
+    print("Train len = %d" % len(train))
+    print("Val len = %d" % len(val))
+    print("Test len = %d" % len(test))
+
     test = SentenceDataset(vocab=vocab, sents=test)
     val = SentenceDataset(vocab=vocab, sents=val)
 
@@ -141,7 +145,7 @@ def main(args):
     log_window_period = 50
     save_model_period = 500
 
-    rolling_loss = RollingAvgLoss(window_size=log_window_period)
+    rolling_loss = RollingAvg(window_size=log_window_period)
 
     criteria = nn.CrossEntropyLoss()
     writer = SummaryWriter()

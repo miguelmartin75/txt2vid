@@ -208,7 +208,11 @@ def train(gan=None, num_epoch=None, dataset=None, device=None, optD=None, optG=N
 
             # TODO: configure prior sample space
             z = torch.randn(batch_size, gan.gen.latent_size, device=device)
-            fake = gan(z, cond=cond)
+            if cond is not None:
+                fake = gan(z, cond=cond[0])
+            else:
+                fake = gan(z, cond=cond)
+
 
             # discrim step
             total_discrim_loss = 0
@@ -223,8 +227,8 @@ def train(gan=None, num_epoch=None, dataset=None, device=None, optD=None, optG=N
                     loss /= params.discrim_steps
                 
                 loss.backward(retain_graph=j != params.discrim_steps - 1 or end2end)
-
                 optD.step()
+
                 total_discrim_loss += float(loss)
 
             discrim_loss.update(float(total_discrim_loss))
@@ -235,7 +239,10 @@ def train(gan=None, num_epoch=None, dataset=None, device=None, optD=None, optG=N
             total_g_loss = 0
             for j in range(params.gen_steps):
                 if j != 0:
-                    fake = gan(z, cond=cond)
+                    if cond is not None:
+                        fake = gan(z, cond=cond[0])
+                    else:
+                        fake = gan(z, cond=cond)
 
                 loss = gan.gen_step(fake=fake, real_pred=real_pred, cond=cond, loss=losses.gen_loss)
                 if not params.no_mean_gen_loss:

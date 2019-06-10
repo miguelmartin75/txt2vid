@@ -1,6 +1,71 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torch.nn import Parameter as P
+
+# A non-local block as used in SA-GAN
+# Note that the implementation as described in the paper is largely incorrect;
+# refer to the released code for the actual implementation.
+# taken from https://github.com/ajbrock/BigGAN-PyTorch/blob/master/layers.py
+class Attention(nn.Module):
+    def __init__(self, ch, which_conv=nn.Conv2d, name='attention'):
+        super(Attention, self).__init__()
+        # Channel multiplier
+        self.ch = ch
+        self.which_conv = which_conv
+        self.theta = self.which_conv(self.ch, self.ch // 8, kernel_size=1, padding=0, bias=False)
+        self.phi = self.which_conv(self.ch, self.ch // 8, kernel_size=1, padding=0, bias=False)
+        self.g = self.which_conv(self.ch, self.ch // 2, kernel_size=1, padding=0, bias=False)
+        self.o = self.which_conv(self.ch // 2, self.ch, kernel_size=1, padding=0, bias=False)
+        # Learnable gain parameter
+        self.gamma = P(torch.tensor(0.), requires_grad=True)
+
+    def forward(self, x, y=None):
+        # Apply convs
+        theta = self.theta(x)
+        phi = F.max_pool2d(self.phi(x), [2,2])
+        g = F.max_pool2d(self.g(x), [2,2])    
+        # Perform reshapes
+        theta = theta.view(-1, self. ch // 8, x.shape[2] * x.shape[3])
+        phi = phi.view(-1, self. ch // 8, x.shape[2] * x.shape[3] // 4)
+        g = g.view(-1, self. ch // 2, x.shape[2] * x.shape[3] // 4)
+        # Matmul and softmax to get attention maps
+        beta = F.softmax(torch.bmm(theta.transpose(1, 2), phi), -1)
+        # Attention map times g path
+        o = self.o(torch.bmm(g, beta.transpose(1,2)).view(-1, self.ch // 2, x.shape[2], x.shape[3]))
+        return self.gamma * o + x
+
+# https://github.com/facebookresearch/video-nonlocal-net/blob/master/lib/models/nonlocal_helper.py
+class Attention3d(nn.Module):
+    def __init__(self, ch, which_conv=nn.Conv3d, name='attention'):
+        super(Attention3d, self).__init__()
+        # Channel multiplier
+        self.ch = ch
+        self.which_conv = which_conv
+        self.theta = self.which_conv(self.ch, self.ch // 8, kernel_size=1, padding=0, bias=False)
+        self.phi = self.which_conv(self.ch, self.ch // 8, kernel_size=1, padding=0, bias=False)
+        self.g = self.which_conv(self.ch, self.ch // 2, kernel_size=1, padding=0, bias=False)
+        self.o = self.which_conv(self.ch // 2, self.ch, kernel_size=1, padding=0, bias=False)
+        # Learnable gain parameter
+        self.gamma = P(torch.tensor(0.), requires_grad=True)
+
+    def forward(self, x, y=None):
+        batch_size = x.size(0)
+
+        # Apply convs
+        theta = self.theta(x)
+        phi = F.max_pool3d(self.phi(x), [1, 2, 2])
+        g = F.max_pool3d(self.g(x), [1, 2, 2])    
+        # Perform reshapes
+        theta = theta.view(batch_size, self. ch // 8, -1)
+        phi = phi.view(batch_size, self. ch // 8, -1)
+        g = g.view(batch_size, self. ch // 2, -1)
+
+        # Matmul and softmax to get attention maps
+        beta = F.softmax(torch.bmm(theta.transpose(1, 2), phi), -1)
+        # Attention map times g path
+        o = self.o(torch.bmm(g, beta.transpose(1,2)).view(batch_size, -1, x.shape[2], x.shape[3], x.shape[4]))
+        return self.gamma * o + x
 
 class Identity(nn.Module):
     def __init__(self):
@@ -87,7 +152,7 @@ class SubsampleRect(nn.Module):
 class UpBlock(nn.Module):
 
     # TODO: unpool layer
-    def __init__(self, in_channels=128, out_channels=None, which_bn=nn.BatchNorm2d, which_conv=nn.Conv2d, upsample_instead=True, which_unpool=nn.ConvTranspose2d, wide=False):
+    def __init__(self, in_channels=128, out_channels=None, which_bn=nn.BatchNorm2d, which_conv=nn.Conv2d, upsample_instead=True, which_unpool=nn.ConvTranspose2d, wide=False, with_non_local=False):
         super().__init__()
 
         self.in_channels = in_channels
@@ -119,8 +184,15 @@ class UpBlock(nn.Module):
 
         self.main = ResidualBlock(inner_module=main_path, identity_map=identity_map)
 
+        self.with_non_local = with_non_local
+        if with_non_local:
+            self.attn = Attention(out_channels)
+
     def forward(self, x):
-        return self.main(x)
+        x = self.main(x)
+        if self.with_non_local:
+            x = self.attn(x)
+        return x
 
 class DownSample(nn.Module):
 

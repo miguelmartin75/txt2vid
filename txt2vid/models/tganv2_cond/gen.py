@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 
-from txt2vid.models.layers import UpBlock, RenderBlock, Subsample
+from txt2vid.models.layers import UpBlock, RenderBlock, Subsample, Attention
 from txt2vid.models.conv_lstm import ConvLSTMCell, ConvLSTM
 
 class BaseFrameGen(nn.Module):
@@ -35,7 +35,9 @@ class MultiScaleGen(nn.Module):
         #self.latent_plane_ch = self.latent_size
         self.latent_plane_ch = self.fm_channels
         self.fm_size = self.fm_width * self.fm_height * self.latent_plane_ch
+
         self.fc = nn.Linear(latent_size + cond_dim, self.fm_size)
+
 
         self.no_lstm = no_lstm
         if no_lstm:
@@ -53,7 +55,8 @@ class MultiScaleGen(nn.Module):
         for i, block in enumerate(additional_blocks):
             prev_block = self.abstract_blocks[i].out_channels
 
-            self.abstract_blocks.append(UpBlock(in_channels=prev_block, out_channels=block))
+            #self.abstract_blocks.append(UpBlock(in_channels=prev_block, out_channels=block))
+            self.abstract_blocks.append(UpBlock(in_channels=prev_block, out_channels=block, with_non_local=i == len(additional_blocks) - 2))
             self.render_blocks.append(RenderBlock(in_channels=block, out_channels=num_channels))
 
         self.abstract_blocks = nn.ModuleList(self.abstract_blocks)
@@ -127,7 +130,7 @@ if __name__ == '__main__':
     latent_size = 256
     device = 'cuda:0'
     cond_dim = 50
-    gen = MultiScaleGen(latent_size=latent_size, width=192, height=192, num_channels=3, cond_dim=cond_dim).to(device)
+    gen = MultiScaleGen(latent_size=latent_size, width=128, height=128, num_channels=3, cond_dim=cond_dim).to(device)
 
     from txt2vid.util.torch.init import init
     print(gen)
@@ -145,6 +148,7 @@ if __name__ == '__main__':
         print('rendered', i, r.size())
 
     from txt2vid.util.misc import count_params
+    print("fc params = %d" % count_params(gen.fc))
     print("Num params = %d" % count_params(gen))
 
     #from torchsummary import summary

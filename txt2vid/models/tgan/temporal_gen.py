@@ -26,7 +26,6 @@ class FrameSeedGenerator(nn.Module):
 
     def forward(self, z_slow):
         h = z_slow.view(z_slow.size(0),-1, 1)
-        print("h=", h.size())
         h = F.relu(self.bn0(self.dc0(h)))
         h = F.relu(self.bn1(self.dc1(h)))
         h = F.relu(self.bn2(self.dc2(h)))

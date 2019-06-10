@@ -1,11 +1,11 @@
 import torch
 import torch.nn as nn
 
-from txt2vid.models.layers import ResidualBlock, DownBlock
+from txt2vid.models.layers import ResidualBlock, DownBlock, Attention3d
 
 class Resnet3D(nn.Module):
 
-    def __init__(self, num_channels=1, mid_ch=64, which_conv=nn.Conv3d, which_pool=nn.AvgPool3d, cond_dim=0, num_down_blocks=4, wide=False):
+    def __init__(self, num_channels=1, mid_ch=64, which_conv=nn.Conv3d, which_pool=nn.AvgPool3d, cond_dim=0, num_down_blocks=4, wide=False, with_attn=True):
         super().__init__()
         self.activation = nn.ReLU(inplace=False)
 
@@ -23,6 +23,9 @@ class Resnet3D(nn.Module):
         out_ch = 128
         for i in range(num_down_blocks):
             down.append(DownBlock(in_channels=in_ch, out_channels=out_ch,  which_conv=which_conv, wide=wide))
+            if i == 0 and with_attn:
+                down.append(Attention3d(out_ch, which_conv=which_conv))
+
             in_ch = out_ch
             out_ch *= 2
 
@@ -62,7 +65,7 @@ if __name__ == '__main__':
     print(net)
     print("Num params = %d" % count_params(net))
 
-    z = net(x)
+    z, _, _ = net(x)
 
     cond_dim = 100
     net_cond = Resnet3D(num_channels=3, cond_dim=cond_dim).cuda()
@@ -70,7 +73,7 @@ if __name__ == '__main__':
     print("Num params = %d" % count_params(net_cond))
 
     cond = torch.randn(batch_size, cond_dim).cuda()
-    z, cond = net_cond(x, cond)
+    z, cond, _ = net_cond(x, cond)
     print("c, cond=")
     print(z.size(), cond.size())
 

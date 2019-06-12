@@ -51,8 +51,18 @@ def get_frames(raw_datum, frame_size=128):
 
 def f(video_dir, video):
     vid = from_path_to_key(video)
-    for idx, frame in enumerate(read_video_file(video, convert_to_pil=False)):
+    frames = list(read_video_file(video, convert_to_pil=False))
+
+    if len(frames) < 16:
+        return vid
+
+    from txt2vid.data import pick_frames
+    frames = pick_frames(frames, random=False, num_frames=16)
+
+
+    for idx, frame in enumerate(frames):
         frame = resize(frame, args.frame_size)
+
         path_to_save = '%s/%s/%d.jpg' % (video_dir, vid, idx)
         parent_path = Path(path_to_save).parent
         if not parent_path.exists():

@@ -49,8 +49,9 @@ def get_frames(raw_datum, frame_size=128):
     #data = data*.5
     return data
 
-def f(video_dir, video):
-    vid = from_path_to_key(video)
+def f(video_dir, video_vid):
+    vid = video_vid[0]
+    video = video_vid[1]
     frames = list(read_video_file(video, convert_to_pil=False))
 
     if len(frames) < 16:
@@ -58,7 +59,6 @@ def f(video_dir, video):
 
     from txt2vid.data import pick_frames
     frames = pick_frames(frames, random=False, num_frames=16)
-
 
     for idx, frame in enumerate(frames):
         frame = resize(frame, args.frame_size)
@@ -133,10 +133,13 @@ def main(args):
             videos = list(get_videos(video_dir))
             videos.sort()
 
-            f_temp = partial(f, video_dir)
-            processed = pool.imap_unordered(f_temp, videos)
+            vids = { from_path_to_key(vid): vid for vid in videos }
+            vids = list(vids.items())
 
-            for vid in tqdm.tqdm(processed, total=len(videos)):
+            f_temp = partial(f, video_dir)
+            processed = pool.imap_unordered(f_temp, vids)
+
+            for vid in tqdm.tqdm(processed, total=len(vids)):
                 continue
 
 if __name__ == '__main__':

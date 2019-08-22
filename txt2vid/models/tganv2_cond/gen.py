@@ -38,7 +38,6 @@ class MultiScaleGen(nn.Module):
 
         self.fc = nn.Linear(latent_size + cond_dim, self.fm_size)
 
-
         self.no_lstm = no_lstm
         if no_lstm:
             from txt2vid.models.tgan.temporal_gen import FrameSeedGenerator

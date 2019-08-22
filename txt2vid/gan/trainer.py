@@ -41,31 +41,42 @@ def add_params_to_parser(parser):
     # TODO: just allow custom datasets in main
     return parser
 
-def test(gan=None, num_samples=1, dataset=None, device=None, params=None, channel_first=True):
+def test(gan=None, num_samples=1, dataset=None, device=None, params=None, channel_first=True, vocab=None):
     ensure_exists(params.out_samples)
 
     gan.gen.eval()
     for i in range(num_samples):
         for j, data in enumerate(dataset):
-            batch_size = data[0].size(0)
+            x = data[0]
+            batch_size = x.size(0)
+
+            num_frames = x.size(1)
+            if channel_first:
+                x = x.permute(0, 2, 1, 3, 4)
 
             y = [ a.to(device) if isinstance(a, torch.Tensor) else a for a in data[1:] ]
 
             cond = None
             if gan.cond_encoder is not None and len(y) >= 2:
                 _, _, cond = gan.cond_encoder.encode(y[0], y[1])
-                if not end2end:
-                    cond = cond.detach()
+                #if not end2end:
+                #    cond = cond.detach()
 
             z = torch.randn(batch_size, gan.gen.latent_size, device=device)
             if False:
                 fake = gan(z, cond=cond, output_blocks=None)
             else:
-                fake = gan(z, cond=cond, output_blocks=range(4))
+                fake = gan(z, cond=cond)
+                #if cond is not None:
+                #else:
+                #    fake = gan(z, cond=cond)
 
+            path = '%s/real_%d.png' % (params.out_samples, i)
+            save_frames(x, path=path, channel_first=channel_first, is_images=params.img_model)
+            
             if cond is not None:
                 path = '%s/sentences_%d_%d.txt' % (params.out_samples, i, j)
-                save_sentences(y[0], path=path)
+                save_sentences(y[0], path=path, vocab=vocab)
 
             for f in fake:
                 if params.img_model:

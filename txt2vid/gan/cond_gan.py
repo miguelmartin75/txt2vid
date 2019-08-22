@@ -200,6 +200,12 @@ class CondGan(object):
 
         if 'cond' in to_load:
             assert(self.cond_encoder is not None)
+            #keys_to_remove = []
+            #for key in to_load['cond']:
+            #    if 'decoder' in key:
+            #        keys_to_remove.append(key)
+            #for key in keys_to_remove:
+            #    to_load['cond'].pop(key, None)
             self.cond_encoder.load_state_dict(to_load['cond'])
 
         if 'sample_mapping' in to_load:

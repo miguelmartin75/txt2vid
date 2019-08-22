@@ -6,6 +6,7 @@ import cv2
 import numpy as np
 
 from txt2vid.data import read_video_file, to_pil
+from txt2vid.data.reddit_videos_json_to_pickle import from_path_to_key
 
 def get_videos(directory):
     valid_suffixes = [ '.avi', '.mp4', '.gif', '.webm' ]
@@ -17,11 +18,7 @@ def get_videos(directory):
 def resize(frame, frame_size):
     return cv2.resize(frame, (frame_size, frame_size))
 
-def get_all_frames(video_dir):
-    videos = list(get_videos(video_dir))
-    videos.sort()
-
-    from txt2vid.data.reddit_videos_json_to_pickle import from_path_to_key
+def get_all_frames(videos):
     for video in tqdm.tqdm(videos):
         vid = from_path_to_key(video)
 
@@ -30,8 +27,8 @@ def get_all_frames(video_dir):
             frame = resize(frame, args.frame_size)
             frames.append(frame)
 
-        if len(frames) == 0:
-            continue
+        #if len(frames) == 0:
+        #    continue
 
         yield vid, frames
 
@@ -51,6 +48,19 @@ def get_frames(raw_datum, frame_size=128):
     data /= 255*.5
     #data = data*.5
     return data
+
+def f(video_dir, video):
+    vid = from_path_to_key(video)
+    for idx, frame in enumerate(read_video_file(video, convert_to_pil=False)):
+        frame = resize(frame, args.frame_size)
+        path_to_save = '%s/%s/%d.jpg' % (video_dir, vid, idx)
+        parent_path = Path(path_to_save).parent
+        if not parent_path.exists():
+            parent_path.mkdir()
+
+        cv2.imwrite(path_to_save, frame)
+
+    return vid
 
 def main(args):
     video_dir = Path(args.dir)
@@ -107,14 +117,17 @@ def main(args):
         print("DONE")
 
     else:
-        for vid, frames in get_all_frames(video_dir):
-            for idx, frame in enumerate(frames):
-                path_to_save = '%s/%s/%d.jpg' % (video_dir, vid, idx)
-                parent_path = Path(path_to_save).parent
-                if not parent_path.exists():
-                    parent_path.mkdir()
+        from functools import partial
+        from multiprocessing import Pool
+        with Pool(args.workers) as pool:
+            videos = list(get_videos(video_dir))
+            videos.sort()
 
-                cv2.imwrite(path_to_save, frame)
+            f_temp = partial(f, video_dir)
+            processed = pool.imap_unordered(f_temp, videos)
+
+            for vid in tqdm.tqdm(processed, total=len(videos)):
+                continue
 
 if __name__ == '__main__':
     import argparse
@@ -124,6 +137,7 @@ if __name__ == '__main__':
     parser.add_argument('--is_labels', action='store_true', default=False, help='is `sent` labels? By default it is assumed that `sent` is sentences.')
     parser.add_argument('--frame_size', type=int, default=256, help='size of frame')
     parser.add_argument('--lmdb', type=str, default=None, help='save to LMDB?')
+    parser.add_argument('--workers', type=int, default=3, help='num workers')
 
     args = parser.parse_args()
     main(args)

@@ -156,7 +156,7 @@ def main(args):
     losses = MixedGanLoss(g_loss=create_object(args.G_loss), d_loss=create_object(args.D_loss))
 
     if args.test:
-        test(gan=gan, num_samples=args.num_samples, dataset=dataset, device=device, params=args, channel_first=not args.sequence_first)
+        test(gan=gan, num_samples=args.num_samples, dataset=dataset, device=device, params=args, channel_first=not args.sequence_first, vocab=vocab)
     else:
         train(gan=gan, num_epoch=args.epochs, dataset=dataset, device=device, optD=optD, optG=optG, params=args, losses=losses, vocab=vocab, channel_first=not args.sequence_first, end2end=args.end2end)
 

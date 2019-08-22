@@ -1,7 +1,7 @@
 {
     "class": "txt2vid.data.my_dataset",
     "args": {
-        "data": "./cooking_videos/train",
+        "data": "./reddit_videos/scraped",
         "num_frames": 16
     }
 }

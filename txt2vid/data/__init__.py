@@ -232,13 +232,13 @@ class Dataset(data.Dataset):
 
             frames = pick_frames(frames, random=random_frames, num_frames=num_frames)
 
-            flip_horiz = random.random() < 0.5
+            #flip_horiz = random.random() < 0.5
 
             def map_frame(path):
                 path = '%s/%s.jpg' % (cache, path)
                 img = Image.open(path)
-                if flip_horiz:
-                    img = F.hflip(img)
+                #if flip_horiz:
+                #    img = F.hflip(img)
 
                 if self.transform:
                     img = self.transform(img)

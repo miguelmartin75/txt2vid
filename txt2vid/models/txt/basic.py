@@ -9,8 +9,10 @@ class Seq2Seq(nn.Module):
         self.separate_decoder = separate_decoder
         self.encoder = RecurrentModel(vocab_size=vocab_size, is_decoder=not separate_decoder)
         if separate_decoder:
+            print("hi")
             self.decoder = RecurrentModel(vocab_size=vocab_size, is_decoder=True, bi=False)
         else:
+            print("yo")
             self.decoder = self.encoder
 
     def encode(self, *args, **kwargs):
@@ -34,11 +36,14 @@ class RecurrentModel(nn.Module):
         self.embed_size = embed_size
 
         self.embed = nn.Embedding(vocab_size, embed_size)
+        if is_decoder:
+            print('hidden size', self.hidden_size)
         self.lstm = nn.LSTM(embed_size, self.hidden_size, num_layers, batch_first=True, bidirectional=self.bi)
 
         # decoder
         self.is_decoder = is_decoder
         if self.is_decoder:
+            print("hello")
             self.to_vocab = nn.Linear(hidden_size, vocab_size)
 
     def forward(self, x, lengths=None, initial_state=None, raw_output=True):

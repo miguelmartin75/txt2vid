@@ -1,0 +1,7 @@
+{
+    "class": "txt2vid.data.my_dataset",
+    "args": {
+        "data": "/run/media/doubleu/Linux/synthetic/train/videos",
+        "num_frames": 16
+    }
+}

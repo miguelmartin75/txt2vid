@@ -58,7 +58,7 @@ From top to bottom:
 ![3.jpg](./thesis/images/cond_mnist/3.jpg)
 
 `'<start> digit 4 is top and bottom<end>'`
-![4.jpg](./images/cond_mnist/4.jpg)
+![4.jpg](./thesis/images/cond_mnist/4.jpg)
 
 ## MSRVDC
 
@@ -85,7 +85,7 @@ From top to bottom:
 ![2_cond](./thesis/images/cond_mr/2.jpg)
 
 `'<start> a woman is peeling a large shrimp in a glass bowl of water<end>'`
-![3_cond](./thesis/images/cond_mr/2.jpg)
+![3_cond](./thesis/images/cond_mr/3.jpg)
 
 ## reddit-videos
 

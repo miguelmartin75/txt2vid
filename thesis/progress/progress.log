@@ -1,0 +1,427 @@
+This is pdfTeX, Version 3.14159265-2.6-1.40.19 (TeX Live 2018/Arch Linux) (preloaded format=pdflatex 2018.10.8)  2 NOV 2018 23:56
+entering extended mode
+ restricted \write18 enabled.
+ file:line:error style messages enabled.
+ %&-line parsing enabled.
+**\input ./progress.tex
+(./progress.tex (/usr/share/texmf-dist/tex/latex/base/article.cls
+Document Class: article 2014/09/29 v1.4h Standard LaTeX document class
+(/usr/share/texmf-dist/tex/latex/base/size10.clo
+File: size10.clo 2014/09/29 v1.4h Standard LaTeX file (size option)
+)
+\c@part=\count80
+\c@section=\count81
+\c@subsection=\count82
+\c@subsubsection=\count83
+\c@paragraph=\count84
+\c@subparagraph=\count85
+\c@figure=\count86
+\c@table=\count87
+\abovecaptionskip=\skip41
+\belowcaptionskip=\skip42
+\bibindent=\dimen102
+)
+(/usr/share/texmf-dist/tex/latex/titlesec/titlesec.sty
+Package: titlesec 2016/03/21 v2.10.2 Sectioning titles
+\ttl@box=\box26
+\beforetitleunit=\skip43
+\aftertitleunit=\skip44
+\ttl@plus=\dimen103
+\ttl@minus=\dimen104
+\ttl@toksa=\toks14
+\titlewidth=\dimen105
+\titlewidthlast=\dimen106
+\titlewidthfirst=\dimen107
+)
+(/usr/share/texmf-dist/tex/latex/float/float.sty
+Package: float 2001/11/08 v1.3d Float enhancements (AL)
+\c@float@type=\count88
+\float@exts=\toks15
+\float@box=\box27
+\@float@everytoks=\toks16
+\@floatcapt=\box28
+)
+(/usr/share/texmf-dist/tex/latex/geometry/geometry.sty
+Package: geometry 2018/04/16 v5.8 Page Geometry
+
+(/usr/share/texmf-dist/tex/latex/graphics/keyval.sty
+Package: keyval 2014/10/28 v1.15 key=value parser (DPC)
+\KV@toks@=\toks17
+)
+(/usr/share/texmf-dist/tex/generic/oberdiek/ifpdf.sty
+Package: ifpdf 2017/03/15 v3.2 Provides the ifpdf switch
+)
+(/usr/share/texmf-dist/tex/generic/oberdiek/ifvtex.sty
+Package: ifvtex 2016/05/16 v1.6 Detect VTeX and its facilities (HO)
+Package ifvtex Info: VTeX not detected.
+)
+(/usr/share/texmf-dist/tex/generic/ifxetex/ifxetex.sty
+Package: ifxetex 2010/09/12 v0.6 Provides ifxetex conditional
+)
+\Gm@cnth=\count89
+\Gm@cntv=\count90
+\c@Gm@tempcnt=\count91
+\Gm@bindingoffset=\dimen108
+\Gm@wd@mp=\dimen109
+\Gm@odd@mp=\dimen110
+\Gm@even@mp=\dimen111
+\Gm@layoutwidth=\dimen112
+\Gm@layoutheight=\dimen113
+\Gm@layouthoffset=\dimen114
+\Gm@layoutvoffset=\dimen115
+\Gm@dimlist=\toks18
+)
+(/usr/share/texmf-dist/tex/latex/appendix/appendix.sty
+Package: appendix 2009/09/02 v1.2b extra appendix facilities
+\c@@pps=\count92
+\c@@ppsavesec=\count93
+\c@@ppsaveapp=\count94
+)
+(/usr/share/texmf-dist/tex/latex/graphics/graphicx.sty
+Package: graphicx 2017/06/01 v1.1a Enhanced LaTeX Graphics (DPC,SPQR)
+
+(/usr/share/texmf-dist/tex/latex/graphics/graphics.sty
+Package: graphics 2017/06/25 v1.2c Standard LaTeX Graphics (DPC,SPQR)
+
+(/usr/share/texmf-dist/tex/latex/graphics/trig.sty
+Package: trig 2016/01/03 v1.10 sin cos tan (DPC)
+)
+(/usr/share/texmf-dist/tex/latex/graphics-cfg/graphics.cfg
+File: graphics.cfg 2016/06/04 v1.11 sample graphics configuration
+)
+Package graphics Info: Driver file: pdftex.def on input line 99.
+
+(/usr/share/texmf-dist/tex/latex/graphics-def/pdftex.def
+File: pdftex.def 2018/01/08 v1.0l Graphics/color driver for pdftex
+))
+\Gin@req@height=\dimen116
+\Gin@req@width=\dimen117
+)
+(/home/doubleu/repos/uni/honours/progress/adelaideuniTitle.sty
+Package: adelaideuniTitle 2015/08/10 v.01 an example package
+ for wikibooks
+)
+(/usr/share/texmf-dist/tex/latex/parskip/parskip.sty
+Package: parskip 2001/04/09 non-zero parskip adjustments
+)
+(/usr/share/texmf-dist/tex/latex/amsmath/amsmath.sty
+Package: amsmath 2017/09/02 v2.17a AMS math features
+\@mathmargin=\skip45
+
+For additional information on amsmath, use the `?' option.
+(/usr/share/texmf-dist/tex/latex/amsmath/amstext.sty
+Package: amstext 2000/06/29 v2.01 AMS text
+
+(/usr/share/texmf-dist/tex/latex/amsmath/amsgen.sty
+File: amsgen.sty 1999/11/30 v2.0 generic functions
+\@emptytoks=\toks19
+\ex@=\dimen118
+))
+(/usr/share/texmf-dist/tex/latex/amsmath/amsbsy.sty
+Package: amsbsy 1999/11/29 v1.2d Bold Symbols
+\pmbraise@=\dimen119
+)
+(/usr/share/texmf-dist/tex/latex/amsmath/amsopn.sty
+Package: amsopn 2016/03/08 v2.02 operator names
+)
+\inf@bad=\count95
+LaTeX Info: Redefining \frac on input line 213.
+\uproot@=\count96
+\leftroot@=\count97
+LaTeX Info: Redefining \overline on input line 375.
+\classnum@=\count98
+\DOTSCASE@=\count99
+LaTeX Info: Redefining \ldots on input line 472.
+LaTeX Info: Redefining \dots on input line 475.
+LaTeX Info: Redefining \cdots on input line 596.
+\Mathstrutbox@=\box29
+\strutbox@=\box30
+\big@size=\dimen120
+LaTeX Font Info:    Redeclaring font encoding OML on input line 712.
+LaTeX Font Info:    Redeclaring font encoding OMS on input line 713.
+\macc@depth=\count100
+\c@MaxMatrixCols=\count101
+\dotsspace@=\muskip10
+\c@parentequation=\count102
+\dspbrk@lvl=\count103
+\tag@help=\toks20
+\row@=\count104
+\column@=\count105
+\maxfields@=\count106
+\andhelp@=\toks21
+\eqnshift@=\dimen121
+\alignsep@=\dimen122
+\tagshift@=\dimen123
+\tagwidth@=\dimen124
+\totwidth@=\dimen125
+\lineht@=\dimen126
+\@envbody=\toks22
+\multlinegap=\skip46
+\multlinetaggap=\skip47
+\mathdisplay@stack=\toks23
+LaTeX Info: Redefining \[ on input line 2817.
+LaTeX Info: Redefining \] on input line 2818.
+)
+(/home/doubleu/repos/uni/honours/progress/progress.aux)
+\openout1 = `progress.aux'.
+
+LaTeX Font Info:    Checking defaults for OML/cmm/m/it on input line 19.
+LaTeX Font Info:    ... okay on input line 19.
+LaTeX Font Info:    Checking defaults for T1/cmr/m/n on input line 19.
+LaTeX Font Info:    ... okay on input line 19.
+LaTeX Font Info:    Checking defaults for OT1/cmr/m/n on input line 19.
+LaTeX Font Info:    ... okay on input line 19.
+LaTeX Font Info:    Checking defaults for OMS/cmsy/m/n on input line 19.
+LaTeX Font Info:    ... okay on input line 19.
+LaTeX Font Info:    Checking defaults for OMX/cmex/m/n on input line 19.
+LaTeX Font Info:    ... okay on input line 19.
+LaTeX Font Info:    Checking defaults for U/cmr/m/n on input line 19.
+LaTeX Font Info:    ... okay on input line 19.
+
+*geometry* driver: auto-detecting
+*geometry* detected driver: pdftex
+*geometry* verbose mode - [ preamble ] result:
+* driver: pdftex
+* paper: a4paper
+* layout: <same size as paper>
+* layoutoffset:(h,v)=(0.0pt,0.0pt)
+* modes: 
+* h-part:(L,W,R)=(72.26999pt, 452.9679pt, 72.26999pt)
+* v-part:(T,H,B)=(72.26999pt, 700.50687pt, 72.26999pt)
+* \paperwidth=597.50787pt
+* \paperheight=845.04684pt
+* \textwidth=452.9679pt
+* \textheight=700.50687pt
+* \oddsidemargin=0.0pt
+* \evensidemargin=0.0pt
+* \topmargin=-37.0pt
+* \headheight=12.0pt
+* \headsep=25.0pt
+* \topskip=10.0pt
+* \footskip=30.0pt
+* \marginparwidth=65.0pt
+* \marginparsep=11.0pt
+* \columnsep=10.0pt
+* \skip\footins=9.0pt plus 4.0pt minus 2.0pt
+* \hoffset=0.0pt
+* \voffset=0.0pt
+* \mag=1000
+* \@twocolumnfalse
+* \@twosidefalse
+* \@mparswitchfalse
+* \@reversemarginfalse
+* (1in=72.27pt=25.4mm, 1cm=28.453pt)
+
+(/usr/share/texmf-dist/tex/context/base/mkii/supp-pdf.mkii
+[Loading MPS to PDF converter (version 2006.09.02).]
+\scratchcounter=\count107
+\scratchdimen=\dimen127
+\scratchbox=\box31
+\nofMPsegments=\count108
+\nofMParguments=\count109
+\everyMPshowfont=\toks24
+\MPscratchCnt=\count110
+\MPscratchDim=\dimen128
+\MPnumerator=\count111
+\makeMPintoPDFobject=\count112
+\everyMPtoPDFconversion=\toks25
+) (/usr/share/texmf-dist/tex/latex/oberdiek/epstopdf-base.sty
+Package: epstopdf-base 2016/05/15 v2.6 Base part for package epstopdf
+
+(/usr/share/texmf-dist/tex/generic/oberdiek/infwarerr.sty
+Package: infwarerr 2016/05/16 v1.4 Providing info/warning/error messages (HO)
+)
+(/usr/share/texmf-dist/tex/latex/oberdiek/grfext.sty
+Package: grfext 2016/05/16 v1.2 Manage graphics extensions (HO)
+
+(/usr/share/texmf-dist/tex/generic/oberdiek/kvdefinekeys.sty
+Package: kvdefinekeys 2016/05/16 v1.4 Define keys (HO)
+
+(/usr/share/texmf-dist/tex/generic/oberdiek/ltxcmds.sty
+Package: ltxcmds 2016/05/16 v1.23 LaTeX kernel commands for general use (HO)
+)))
+(/usr/share/texmf-dist/tex/latex/oberdiek/kvoptions.sty
+Package: kvoptions 2016/05/16 v3.12 Key value format for package options (HO)
+
+(/usr/share/texmf-dist/tex/generic/oberdiek/kvsetkeys.sty
+Package: kvsetkeys 2016/05/16 v1.17 Key value parser (HO)
+
+(/usr/share/texmf-dist/tex/generic/oberdiek/etexcmds.sty
+Package: etexcmds 2016/05/16 v1.6 Avoid name clashes with e-TeX commands (HO)
+
+(/usr/share/texmf-dist/tex/generic/oberdiek/ifluatex.sty
+Package: ifluatex 2016/05/16 v1.4 Provides the ifluatex switch (HO)
+Package ifluatex Info: LuaTeX not detected.
+)
+Package etexcmds Info: Could not find \expanded.
+(etexcmds)             That can mean that you are not using pdfTeX 1.50 or
+(etexcmds)             that some package has redefined \expanded.
+(etexcmds)             In the latter case, load this package earlier.
+)))
+(/usr/share/texmf-dist/tex/generic/oberdiek/pdftexcmds.sty
+Package: pdftexcmds 2018/01/30 v0.27 Utility functions of pdfTeX for LuaTeX (HO
+)
+Package pdftexcmds Info: LuaTeX not detected.
+Package pdftexcmds Info: \pdf@primitive is available.
+Package pdftexcmds Info: \pdf@ifprimitive is available.
+Package pdftexcmds Info: \pdfdraftmode found.
+)
+Package epstopdf-base Info: Redefining graphics rule for `.eps' on input line 4
+38.
+Package grfext Info: Graphics extension search list:
+(grfext)             [.pdf,.png,.jpg,.mps,.jpeg,.jbig2,.jb2,.PDF,.PNG,.JPG,.JPE
+G,.JBIG2,.JB2,.eps]
+(grfext)             \AppendGraphicsExtensions on input line 456.
+
+(/usr/share/texmf-dist/tex/latex/latexconfig/epstopdf-sys.cfg
+File: epstopdf-sys.cfg 2010/07/13 v1.3 Configuration of (r)epstopdf for TeX Liv
+e
+)) [1
+
+{/var/lib/texmf/fonts/map/pdftex/updmap/pdftex.map}]
+(/home/doubleu/repos/uni/honours/progress/progress.toc)
+\tf@toc=\write3
+\openout3 = `progress.toc'.
+
+ [1] [2] [3]
+LaTeX Font Info:    Try loading font information for OMS+cmr on input line 197.
+
+
+(/usr/share/texmf-dist/tex/latex/base/omscmr.fd
+File: omscmr.fd 2014/09/29 v2.5h Standard LaTeX font definitions
+)
+LaTeX Font Info:    Font shape `OMS/cmr/m/n' in size <10> not available
+(Font)              Font shape `OMS/cmsy/m/n' tried instead on input line 197.
+ [4] [5]
+<imgs/mnist/fake_mnist.png, id=30, 631.82584pt x 475.83713pt>
+File: imgs/mnist/fake_mnist.png Graphic file (type png)
+<use imgs/mnist/fake_mnist.png>
+Package pdftex.def Info: imgs/mnist/fake_mnist.png  used on input line 290.
+(pdftex.def)             Requested size: 203.83417pt x 153.51256pt.
+<imgs/mnist/true_mnist.png, id=31, 608.92842pt x 458.66406pt>
+File: imgs/mnist/true_mnist.png Graphic file (type png)
+<use imgs/mnist/true_mnist.png>
+Package pdftex.def Info: imgs/mnist/true_mnist.png  used on input line 291.
+(pdftex.def)             Requested size: 203.83417pt x 153.52917pt.
+<imgs/mnist/mnist_artifacts.png, id=32, 624.6704pt x 480.1304pt>
+File: imgs/mnist/mnist_artifacts.png Graphic file (type png)
+<use imgs/mnist/mnist_artifacts.png>
+Package pdftex.def Info: imgs/mnist/mnist_artifacts.png  used on input line 297
+.
+(pdftex.def)             Requested size: 362.37569pt x 278.5271pt.
+ [6 </home/doubleu/repos/uni/honours/progress/imgs/mnist/fake_mnist.png (PNG co
+py)> </home/doubleu/repos/uni/honours/progress/imgs/mnist/true_mnist.png (PNG c
+opy)>]
+<imgs/mnist/mode_collapse.png, id=37, 805.0075pt x 52.195pt>
+File: imgs/mnist/mode_collapse.png Graphic file (type png)
+<use imgs/mnist/mode_collapse.png>
+Package pdftex.def Info: imgs/mnist/mode_collapse.png  used on input line 303.
+(pdftex.def)             Requested size: 362.37569pt x 23.49548pt.
+<imgs/mnist/mode_collapse2.png, id=38, 805.0075pt x 52.195pt>
+File: imgs/mnist/mode_collapse2.png Graphic file (type png)
+<use imgs/mnist/mode_collapse2.png>
+Package pdftex.def Info: imgs/mnist/mode_collapse2.png  used on input line 304.
+
+(pdftex.def)             Requested size: 362.37569pt x 23.49548pt.
+<imgs/mnist/mode_collapse3.png, id=39, 805.0075pt x 52.195pt>
+File: imgs/mnist/mode_collapse3.png Graphic file (type png)
+<use imgs/mnist/mode_collapse3.png>
+Package pdftex.def Info: imgs/mnist/mode_collapse3.png  used on input line 305.
+
+(pdftex.def)             Requested size: 362.37569pt x 23.49548pt.
+<imgs/mnist/minst_9_true.png, id=40, 749.17516pt x 45.79485pt>
+File: imgs/mnist/minst_9_true.png Graphic file (type png)
+<use imgs/mnist/minst_9_true.png>
+Package pdftex.def Info: imgs/mnist/minst_9_true.png  used on input line 311.
+(pdftex.def)             Requested size: 362.37569pt x 22.15106pt.
+<imgs/mnist/minst_fake_9.png, id=41, 744.88188pt x 42.93268pt>
+File: imgs/mnist/minst_fake_9.png Graphic file (type png)
+<use imgs/mnist/minst_fake_9.png>
+Package pdftex.def Info: imgs/mnist/minst_fake_9.png  used on input line 312.
+(pdftex.def)             Requested size: 362.37569pt x 20.88585pt.
+ [7 </home/doubleu/repos/uni/honours/progress/imgs/mnist/mnist_artifacts.png (P
+NG copy)> </home/doubleu/repos/uni/honours/progress/imgs/mnist/mode_collapse.pn
+g (PNG copy)> </home/doubleu/repos/uni/honours/progress/imgs/mnist/mode_collaps
+e2.png (PNG copy)> </home/doubleu/repos/uni/honours/progress/imgs/mnist/mode_co
+llapse3.png (PNG copy)> </home/doubleu/repos/uni/honours/progress/imgs/mnist/mi
+nst_9_true.png (PNG copy)> </home/doubleu/repos/uni/honours/progress/imgs/mnist
+/minst_fake_9.png (PNG copy)>]
+<imgs/mrvdc/good_1.png, id=45, 827.16951pt x 103.75397pt>
+File: imgs/mrvdc/good_1.png Graphic file (type png)
+<use imgs/mrvdc/good_1.png>
+Package pdftex.def Info: imgs/mrvdc/good_1.png  used on input line 339.
+(pdftex.def)             Requested size: 362.37569pt x 45.45398pt.
+<imgs/mrvdc/good_2.png, id=46, 816.43634pt x 108.76277pt>
+File: imgs/mrvdc/good_2.png Graphic file (type png)
+<use imgs/mrvdc/good_2.png>
+Package pdftex.def Info: imgs/mrvdc/good_2.png  used on input line 340.
+(pdftex.def)             Requested size: 362.37569pt x 48.27563pt.
+<imgs/mrvdc/bad_quality.png, id=47, 838.61823pt x 230.40535pt>
+File: imgs/mrvdc/bad_quality.png Graphic file (type png)
+<use imgs/mrvdc/bad_quality.png>
+Package pdftex.def Info: imgs/mrvdc/bad_quality.png  used on input line 346.
+(pdftex.def)             Requested size: 362.37569pt x 99.56104pt.
+<imgs/mrvdc/real_samples.png, id=48, 573.86673pt x 353.479pt>
+File: imgs/mrvdc/real_samples.png Graphic file (type png)
+<use imgs/mrvdc/real_samples.png>
+Package pdftex.def Info: imgs/mrvdc/real_samples.png  used on input line 352.
+(pdftex.def)             Requested size: 362.37569pt x 223.21613pt.
+<imgs/mrvdc/compare.png, id=49, 815.00525pt x 163.14417pt>
+File: imgs/mrvdc/compare.png Graphic file (type png)
+<use imgs/mrvdc/compare.png>
+Package pdftex.def Info: imgs/mrvdc/compare.png  used on input line 358.
+(pdftex.def)             Requested size: 362.37569pt x 72.53792pt.
+ [8 </home/doubleu/repos/uni/honours/progress/imgs/mrvdc/good_1.png (PNG copy)>
+ </home/doubleu/repos/uni/honours/progress/imgs/mrvdc/good_2.png (PNG copy)> </
+home/doubleu/repos/uni/honours/progress/imgs/mrvdc/bad_quality.png (PNG copy)> 
+</home/doubleu/repos/uni/honours/progress/imgs/mrvdc/real_samples.png (PNG copy
+)>]
+<imgs/mrvdc/test1.png, id=53, 743.45079pt x 201.78357pt>
+File: imgs/mrvdc/test1.png Graphic file (type png)
+<use imgs/mrvdc/test1.png>
+Package pdftex.def Info: imgs/mrvdc/test1.png  used on input line 364.
+(pdftex.def)             Requested size: 362.37569pt x 98.35446pt.
+<imgs/mrvdc/test2.png, id=54, 777.08139pt x 213.94781pt>
+File: imgs/mrvdc/test2.png Graphic file (type png)
+<use imgs/mrvdc/test2.png>
+Package pdftex.def Info: imgs/mrvdc/test2.png  used on input line 370.
+(pdftex.def)             Requested size: 362.37569pt x 99.77197pt.
+ [9 </home/doubleu/repos/uni/honours/progress/imgs/mrvdc/compare.png (PNG copy)
+> </home/doubleu/repos/uni/honours/progress/imgs/mrvdc/test1.png (PNG copy)> </
+home/doubleu/repos/uni/honours/progress/imgs/mrvdc/test2.png (PNG copy)>] [10] 
+[11] [12]
+(/home/doubleu/repos/uni/honours/progress/progress.bbl
+Underfull \hbox (badness 1783) in paragraph at lines 90--93
+[]\OT1/cmr/m/n/10 M. MacKay, P. Vi-col, J. Ba, and R. Grosse, ``Re-versible Re-
+cur-rent Neu-ral Net-works,''
+ []
+
+) [13] (/home/doubleu/repos/uni/honours/progress/progress.aux) )
+(\end occurred inside a group at level 2)
+
+### simple group (level 2) entered at line 258 ({)
+### simple group (level 1) entered at line 257 ({)
+### bottom level 
+Here is how much of TeX's memory you used:
+ 3100 strings out of 492642
+ 43340 string characters out of 6135566
+ 120286 words of memory out of 5000000
+ 6928 multiletter control sequences out of 15000+600000
+ 7814 words of font info for 28 fonts, out of 8000000 for 9000
+ 1141 hyphenation exceptions out of 8191
+ 41i,5n,32p,793b,262s stack positions out of 5000i,500n,10000p,200000b,80000s
+</usr/share/texmf-dist/fonts/type1/public/amsfonts/cm/cmbx10.pf
+b></usr/share/texmf-dist/fonts/type1/public/amsfonts/cm/cmbx12.pfb></usr/share/
+texmf-dist/fonts/type1/public/amsfonts/cm/cmcsc10.pfb></usr/share/texmf-dist/fo
+nts/type1/public/amsfonts/cm/cmmi10.pfb></usr/share/texmf-dist/fonts/type1/publ
+ic/amsfonts/cm/cmr10.pfb></usr/share/texmf-dist/fonts/type1/public/amsfonts/cm/
+cmr12.pfb></usr/share/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy10.pfb></us
+r/share/texmf-dist/fonts/type1/public/amsfonts/cm/cmti10.pfb></usr/share/texmf-
+dist/fonts/type1/public/amsfonts/cm/cmti12.pfb>
+Output written on progress.pdf (14 pages, 3694464 bytes).
+PDF statistics:
+ 101 PDF objects out of 1000 (max. 8388607)
+ 60 compressed objects within 1 object stream
+ 0 named destinations out of 1000 (max. 500000)
+ 76 words of extra memory for PDF output out of 10000 (max. 10000000)
+

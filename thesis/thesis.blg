@@ -1,0 +1,50 @@
+This is BibTeX, Version 0.99d (TeX Live 2019)
+Capacity: max_strings=100000, hash_size=100000, hash_prime=85009
+The top-level auxiliary file: thesis.aux
+The style file: plain.bst
+Database file #1: Thesis.bib
+Warning--to sort, need author or key in noauthor_microsoft_nodate
+Warning--to sort, need author or key in noauthor_ucf101_nodate
+Warning--empty journal in radford_language_2019
+You've used 29 entries,
+            2118 wiz_defined-function locations,
+            642 strings with 9481 characters,
+and the built_in function-call counts, 9161 in all, are:
+= -- 835
+> -- 643
+< -- 2
++ -- 254
+- -- 223
+* -- 650
+:= -- 1667
+add.period$ -- 106
+call.type$ -- 29
+change.case$ -- 195
+chr.to.int$ -- 0
+cite$ -- 32
+duplicate$ -- 305
+empty$ -- 549
+format.name$ -- 223
+if$ -- 1799
+int.to.chr$ -- 0
+int.to.str$ -- 29
+missing$ -- 27
+newline$ -- 166
+num.names$ -- 56
+pop$ -- 197
+preamble$ -- 1
+purify$ -- 167
+quote$ -- 0
+skip$ -- 235
+stack$ -- 0
+substring$ -- 191
+swap$ -- 44
+text.length$ -- 2
+text.prefix$ -- 0
+top$ -- 0
+type$ -- 114
+warning$ -- 3
+while$ -- 59
+width$ -- 31
+write$ -- 327
+(There were 3 warnings)

@@ -1,0 +1,189 @@
+\begin{thebibliography}{10}
+
+\bibitem{noauthor_microsoft_nodate}
+Microsoft {Research} {Video} {Description} {Corpus}.
+
+\bibitem{noauthor_ucf101_nodate}
+{UCF}101 - {Action} {Recognition} {Data} {Set}.
+
+\bibitem{arjovsky_wasserstein_2017}
+Martin Arjovsky, Soumith Chintala, and Léon Bottou.
+\newblock Wasserstein {GAN}.
+\newblock {\em arXiv:1701.07875 [cs, stat]}, January 2017.
+\newblock arXiv: 1701.07875.
+
+\bibitem{brock_large_2018}
+Andrew Brock, Jeff Donahue, and Karen Simonyan.
+\newblock Large {Scale} {GAN} {Training} for {High} {Fidelity} {Natural}
+  {Image} {Synthesis}.
+\newblock {\em arXiv:1809.11096 [cs, stat]}, September 2018.
+\newblock arXiv: 1809.11096.
+
+\bibitem{carreira_quo_2017}
+Joao Carreira and Andrew Zisserman.
+\newblock Quo {Vadis}, {Action} {Recognition}? {A} {New} {Model} and the
+  {Kinetics} {Dataset}.
+\newblock {\em arXiv:1705.07750 [cs]}, May 2017.
+\newblock arXiv: 1705.07750.
+
+\bibitem{dai_semi-supervised_2015}
+Andrew~M Dai and Quoc~V Le.
+\newblock Semi-supervised {Sequence} {Learning}.
+\newblock In C.~Cortes, N.~D. Lawrence, D.~D. Lee, M.~Sugiyama, and R.~Garnett,
+  editors, {\em Advances in {Neural} {Information} {Processing} {Systems} 28},
+  pages 3079--3087. Curran Associates, Inc., 2015.
+
+\bibitem{goodfellow_deep_2016}
+Ian Goodfellow, Yoshua Bengio, and Aaron Courville.
+\newblock {\em Deep {Learning}}.
+\newblock MIT Press, 2016.
+
+\bibitem{goodfellow_generative_2014}
+Ian~J. Goodfellow, Jean Pouget-Abadie, Mehdi Mirza, Bing Xu, David
+  Warde-Farley, Sherjil Ozair, Aaron Courville, and Yoshua Bengio.
+\newblock Generative {Adversarial} {Networks}.
+\newblock {\em arXiv:1406.2661 [cs, stat]}, June 2014.
+\newblock arXiv: 1406.2661.
+
+\bibitem{gulrajani_improved_2017}
+Ishaan Gulrajani, Faruk Ahmed, Martin Arjovsky, Vincent Dumoulin, and Aaron
+  Courville.
+\newblock Improved {Training} of {Wasserstein} {GANs}.
+\newblock {\em arXiv:1704.00028 [cs, stat]}, March 2017.
+\newblock arXiv: 1704.00028.
+
+\bibitem{he_deep_2015}
+Kaiming He, Xiangyu Zhang, Shaoqing Ren, and Jian Sun.
+\newblock Deep {Residual} {Learning} for {Image} {Recognition}.
+\newblock {\em arXiv:1512.03385 [cs]}, December 2015.
+\newblock arXiv: 1512.03385.
+
+\bibitem{heusel_gans_2017}
+Martin Heusel, Hubert Ramsauer, Thomas Unterthiner, Bernhard Nessler, and Sepp
+  Hochreiter.
+\newblock {GANs} {Trained} by a {Two} {Time}-{Scale} {Update} {Rule} {Converge}
+  to a {Local} {Nash} {Equilibrium}.
+\newblock {\em arXiv:1706.08500 [cs, stat]}, June 2017.
+\newblock arXiv: 1706.08500.
+
+\bibitem{ioffe_batch_2015}
+Sergey Ioffe and Christian Szegedy.
+\newblock Batch {Normalization}: {Accelerating} {Deep} {Network} {Training} by
+  {Reducing} {Internal} {Covariate} {Shift}.
+\newblock {\em arXiv:1502.03167 [cs]}, February 2015.
+\newblock arXiv: 1502.03167.
+
+\bibitem{jacobsen_i-revnet:_2018}
+Jörn-Henrik Jacobsen, Arnold Smeulders, and Edouard Oyallon.
+\newblock i-{RevNet}: {Deep} {Invertible} {Networks}.
+\newblock {\em arXiv:1802.07088 [cs, stat]}, February 2018.
+\newblock arXiv: 1802.07088.
+
+\bibitem{jolicoeur-martineau_relativistic_2018}
+Alexia Jolicoeur-Martineau.
+\newblock The relativistic discriminator: a key element missing from standard
+  {GAN}.
+\newblock {\em arXiv:1807.00734 [cs, stat]}, July 2018.
+\newblock arXiv: 1807.00734.
+
+\bibitem{kay_kinetics_2017}
+Will Kay, Joao Carreira, Karen Simonyan, Brian Zhang, Chloe Hillier, Sudheendra
+  Vijayanarasimhan, Fabio Viola, Tim Green, Trevor Back, Paul Natsev, Mustafa
+  Suleyman, and Andrew Zisserman.
+\newblock The {Kinetics} {Human} {Action} {Video} {Dataset}.
+\newblock {\em arXiv:1705.06950 [cs]}, May 2017.
+\newblock arXiv: 1705.06950.
+
+\bibitem{kingma_glow:_2018}
+Diederik~P. Kingma and Prafulla Dhariwal.
+\newblock Glow: {Generative} {Flow} with {Invertible} 1x1 {Convolutions}.
+\newblock {\em arXiv:1807.03039 [cs, stat]}, July 2018.
+\newblock arXiv: 1807.03039.
+
+\bibitem{li_video_2017}
+Yitong Li, Martin~Renqiang Min, Dinghan Shen, David Carlson, and Lawrence
+  Carin.
+\newblock Video {Generation} {From} {Text}.
+\newblock {\em arXiv:1710.00421 [cs]}, October 2017.
+\newblock arXiv: 1710.00421.
+
+\bibitem{martin_miguelmartin75/txt2vid_nodate}
+Miguel Martin.
+\newblock miguelmartin75/txt2vid.
+
+\bibitem{mirza_conditional_2014}
+Mehdi Mirza and Simon Osindero.
+\newblock Conditional {Generative} {Adversarial} {Nets}.
+\newblock {\em arXiv:1411.1784 [cs, stat]}, November 2014.
+\newblock arXiv: 1411.1784.
+
+\bibitem{pan_create_2018}
+Yingwei Pan, Zhaofan Qiu, Ting Yao, Houqiang Li, and Tao Mei.
+\newblock To {Create} {What} {You} {Tell}: {Generating} {Videos} from
+  {Captions}.
+\newblock {\em arXiv:1804.08264 [cs]}, April 2018.
+\newblock arXiv: 1804.08264.
+
+\bibitem{radford_unsupervised_2015}
+Alec Radford, Luke Metz, and Soumith Chintala.
+\newblock Unsupervised {Representation} {Learning} with {Deep} {Convolutional}
+  {Generative} {Adversarial} {Networks}.
+\newblock {\em arXiv:1511.06434 [cs]}, November 2015.
+\newblock arXiv: 1511.06434.
+
+\bibitem{radford_language_2019}
+Alec Radford, Jeffrey Wu, Rewon Child, David Luan, Dario Amodei, and Ilya
+  Sutskever.
+\newblock Language {Models} are {Unsupervised} {Multitask} {Learners}.
+\newblock page~24, February 2019.
+
+\bibitem{saito_temporal_2016}
+Masaki Saito, Eiichi Matsumoto, and Shunta Saito.
+\newblock Temporal {Generative} {Adversarial} {Nets} with {Singular} {Value}
+  {Clipping}.
+\newblock {\em arXiv:1611.06624 [cs]}, November 2016.
+\newblock arXiv: 1611.06624.
+
+\bibitem{saito_tganv2:_2018}
+Masaki Saito and Shunta Saito.
+\newblock {TGANv}2: {Efficient} {Training} of {Large} {Models} for {Video}
+  {Generation} with {Multiple} {Subsampling} {Layers}.
+\newblock {\em arXiv:1811.09245 [cs]}, November 2018.
+\newblock arXiv: 1811.09245.
+
+\bibitem{salimans_improved_2016}
+Tim Salimans, Ian Goodfellow, Wojciech Zaremba, Vicki Cheung, Alec Radford, and
+  Xi~Chen.
+\newblock Improved {Techniques} for {Training} {GANs}.
+\newblock {\em arXiv:1606.03498 [cs]}, June 2016.
+\newblock arXiv: 1606.03498.
+
+\bibitem{shi_convolutional_2015}
+Xingjian Shi, Zhourong Chen, Hao Wang, Dit-Yan Yeung, Wai-kin Wong, and
+  Wang-chun Woo.
+\newblock Convolutional {LSTM} {Network}: {A} {Machine} {Learning} {Approach}
+  for {Precipitation} {Nowcasting}.
+\newblock {\em arXiv:1506.04214 [cs]}, June 2015.
+\newblock arXiv: 1506.04214.
+
+\bibitem{wang_non-local_2017}
+Xiaolong Wang, Ross Girshick, Abhinav Gupta, and Kaiming He.
+\newblock Non-local {Neural} {Networks}.
+\newblock {\em arXiv:1711.07971 [cs]}, November 2017.
+\newblock arXiv: 1711.07971.
+
+\bibitem{zhang_self-attention_2018}
+Han Zhang, Ian Goodfellow, Dimitris Metaxas, and Augustus Odena.
+\newblock Self-{Attention} {Generative} {Adversarial} {Networks}.
+\newblock {\em arXiv:1805.08318 [cs, stat]}, May 2018.
+\newblock arXiv: 1805.08318.
+
+\bibitem{zhang_stackgan++:_2017}
+Han Zhang, Tao Xu, Hongsheng Li, Shaoting Zhang, Xiaogang Wang, Xiaolei Huang,
+  and Dimitris Metaxas.
+\newblock {StackGAN}++: {Realistic} {Image} {Synthesis} with {Stacked}
+  {Generative} {Adversarial} {Networks}.
+\newblock {\em arXiv:1710.10916 [cs, stat]}, October 2017.
+\newblock arXiv: 1710.10916.
+
+\end{thebibliography}

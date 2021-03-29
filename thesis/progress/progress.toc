@@ -1,0 +1,36 @@
+\contentsline {section}{\numberline {1}Introduction}{2}
+\contentsline {section}{\numberline {2}Background}{2}
+\contentsline {subsection}{\numberline {2.1}Generative Modelling}{2}
+\contentsline {subsection}{\numberline {2.2}Generative Adversarial Networks (GANs)}{2}
+\contentsline {subsubsection}{\numberline {2.2.1}DCGAN}{3}
+\contentsline {subsubsection}{\numberline {2.2.2}WGAN and WGAN-GP}{3}
+\contentsline {section}{\numberline {3}Review of Literature}{3}
+\contentsline {subsection}{\numberline {3.1}Video Generation From Text}{3}
+\contentsline {subsection}{\numberline {3.2}To Create What You Tell: Generating Videos from Captions}{4}
+\contentsline {subsection}{\numberline {3.3}Imagine This! Scripts to Compositions to Videos}{4}
+\contentsline {section}{\numberline {4}Progress}{5}
+\contentsline {subsection}{\numberline {4.1}Toy Dataset}{5}
+\contentsline {subsection}{\numberline {4.2}MRVDC}{7}
+\contentsline {section}{\numberline {5}Next Semester}{9}
+\contentsline {subsection}{\numberline {5.1}November}{10}
+\contentsline {subsubsection}{\numberline {5.1.1}Goals and Purpose}{10}
+\contentsline {subsubsection}{\numberline {5.1.2}Deliverables}{10}
+\contentsline {subsection}{\numberline {5.2}December}{10}
+\contentsline {subsubsection}{\numberline {5.2.1}Goals and Purpose}{10}
+\contentsline {subsubsection}{\numberline {5.2.2}Deliverables}{10}
+\contentsline {subsection}{\numberline {5.3}January}{11}
+\contentsline {subsubsection}{\numberline {5.3.1}Goals and Purpose}{11}
+\contentsline {subsubsection}{\numberline {5.3.2}Deliverables}{11}
+\contentsline {subsection}{\numberline {5.4}February}{11}
+\contentsline {subsubsection}{\numberline {5.4.1}Goals and Purpose}{11}
+\contentsline {subsubsection}{\numberline {5.4.2}Deliverables}{11}
+\contentsline {subsection}{\numberline {5.5}March}{11}
+\contentsline {subsubsection}{\numberline {5.5.1}Goals and Purpose}{11}
+\contentsline {subsubsection}{\numberline {5.5.2}Deliverables}{11}
+\contentsline {subsection}{\numberline {5.6}April}{11}
+\contentsline {subsubsection}{\numberline {5.6.1}Goals and Purpose}{11}
+\contentsline {subsubsection}{\numberline {5.6.2}Deliverables}{12}
+\contentsline {subsection}{\numberline {5.7}June (until week 13)}{12}
+\contentsline {subsubsection}{\numberline {5.7.1}Goals and Purpose}{12}
+\contentsline {subsubsection}{\numberline {5.7.2}Deliverables}{12}
+\contentsline {section}{\numberline {6}Conclusion}{12}

@@ -1,0 +1,117 @@
+\begin{thebibliography}{10}
+
+\bibitem{goodfellow_nips_2016}
+I.~Goodfellow, ``{NIPS} 2016 {Tutorial}: {Generative} {Adversarial}
+  {Networks},'' {\em arXiv:1701.00160 [cs]}, Dec. 2016.
+\newblock arXiv: 1701.00160.
+
+\bibitem{goodfellow_generative_2014}
+I.~J. Goodfellow, J.~Pouget-Abadie, M.~Mirza, B.~Xu, D.~Warde-Farley, S.~Ozair,
+  A.~Courville, and Y.~Bengio, ``Generative {Adversarial} {Networks},'' {\em
+  arXiv:1406.2661 [cs, stat]}, June 2014.
+\newblock arXiv: 1406.2661.
+
+\bibitem{li_video_2017}
+Y.~Li, M.~R. Min, D.~Shen, D.~Carlson, and L.~Carin, ``Video {Generation}
+  {From} {Text},'' {\em arXiv:1710.00421 [cs]}, Oct. 2017.
+\newblock arXiv: 1710.00421.
+
+\bibitem{pan_create_2018}
+Y.~Pan, Z.~Qiu, T.~Yao, H.~Li, and T.~Mei, ``To {Create} {What} {You} {Tell}:
+  {Generating} {Videos} from {Captions},'' {\em arXiv:1804.08264 [cs]}, Apr.
+  2018.
+\newblock arXiv: 1804.08264.
+
+\bibitem{kingma_adam:_2014}
+D.~P. Kingma and J.~Ba, ``Adam: {A} {Method} for {Stochastic} {Optimization},''
+  {\em arXiv:1412.6980 [cs]}, Dec. 2014.
+\newblock arXiv: 1412.6980.
+
+\bibitem{radford_unsupervised_2015}
+A.~Radford, L.~Metz, and S.~Chintala, ``Unsupervised {Representation}
+  {Learning} with {Deep} {Convolutional} {Generative} {Adversarial}
+  {Networks},'' {\em arXiv:1511.06434 [cs]}, Nov. 2015.
+\newblock arXiv: 1511.06434.
+
+\bibitem{springenberg_striving_2014}
+J.~T. Springenberg, A.~Dosovitskiy, T.~Brox, and M.~Riedmiller, ``Striving for
+  {Simplicity}: {The} {All} {Convolutional} {Net},'' {\em arXiv:1412.6806
+  [cs]}, Dec. 2014.
+\newblock arXiv: 1412.6806.
+
+\bibitem{arjovsky_wasserstein_2017}
+M.~Arjovsky, S.~Chintala, and L.~Bottou, ``Wasserstein {GAN},'' Jan. 2017.
+
+\bibitem{weng_gan_nodate}
+L.~Weng, ``From {GAN} to {WGAN}.''
+
+\bibitem{gulrajani_improved_2017}
+I.~Gulrajani, F.~Ahmed, M.~Arjovsky, V.~Dumoulin, and A.~Courville, ``Improved
+  {Training} of {Wasserstein} {GANs},'' {\em arXiv:1704.00028 [cs, stat]}, Mar.
+  2017.
+\newblock arXiv: 1704.00028.
+
+\bibitem{kay_kinetics_2017}
+W.~Kay, J.~Carreira, K.~Simonyan, B.~Zhang, C.~Hillier, S.~Vijayanarasimhan,
+  F.~Viola, T.~Green, T.~Back, P.~Natsev, M.~Suleyman, and A.~Zisserman, ``The
+  {Kinetics} {Human} {Action} {Video} {Dataset},'' {\em arXiv:1705.06950 [cs]},
+  May 2017.
+\newblock arXiv: 1705.06950.
+
+\bibitem{noauthor_microsoft_nodate}
+``Microsoft {Research} {Video} {Description} {Corpus}.''
+
+\bibitem{gupta_imagine_2018}
+T.~Gupta, D.~Schwenk, A.~Farhadi, D.~Hoiem, and A.~Kembhavi, ``Imagine {This}!
+  {Scripts} to {Compositions} to {Videos},'' {\em arXiv:1804.03608 [cs]}, Apr.
+  2018.
+\newblock arXiv: 1804.03608.
+
+\bibitem{paszke_automatic_2017}
+A.~Paszke, S.~Gross, S.~Chintala, G.~Chanan, E.~Yang, Z.~DeVito, Z.~Lin,
+  A.~Desmaison, L.~Antiga, and A.~Lerer, ``Automatic differentiation in
+  {PyTorch},'' Oct. 2017.
+
+\bibitem{dai_semi-supervised_2015}
+A.~M. Dai and Q.~V. Le, ``Semi-supervised {Sequence} {Learning},'' in {\em
+  Advances in {Neural} {Information} {Processing} {Systems} 28} (C.~Cortes,
+  N.~D. Lawrence, D.~D. Lee, M.~Sugiyama, and R.~Garnett, eds.),
+  pp.~3079--3087, Curran Associates, Inc., 2015.
+
+\bibitem{yann_mnist_nodate}
+L.~Yann, C.~Corinna, and B.~Chris, ``{MNIST} handwritten digit database, {Yann}
+  {LeCun}, {Corinna} {Cortes} and {Chris} {Burges}.''
+
+\bibitem{xu_empirical_2015}
+B.~Xu, N.~Wang, T.~Chen, and M.~Li, ``Empirical {Evaluation} of {Rectified}
+  {Activations} in {Convolutional} {Network},'' May 2015.
+
+\bibitem{mackay_reversible_2018}
+M.~MacKay, P.~Vicol, J.~Ba, and R.~Grosse, ``Reversible {Recurrent} {Neural}
+  {Networks},'' {\em arXiv:1810.10999 [cs, stat]}, Oct. 2018.
+\newblock arXiv: 1810.10999.
+
+\bibitem{johnson_image_2018}
+J.~Johnson, A.~Gupta, and L.~Fei-Fei, ``Image {Generation} from {Scene}
+  {Graphs},'' {\em arXiv:1804.01622 [cs]}, Apr. 2018.
+\newblock arXiv: 1804.01622.
+
+\bibitem{zhang_stackgan++:_2017}
+H.~Zhang, T.~Xu, H.~Li, S.~Zhang, X.~Wang, X.~Huang, and D.~Metaxas,
+  ``{StackGAN}++: {Realistic} {Image} {Synthesis} with {Stacked} {Generative}
+  {Adversarial} {Networks},'' {\em arXiv:1710.10916 [cs, stat]}, Oct. 2017.
+\newblock arXiv: 1710.10916.
+
+\bibitem{xu_attngan:_2017}
+T.~Xu, P.~Zhang, Q.~Huang, H.~Zhang, Z.~Gan, X.~Huang, and X.~He, ``{AttnGAN}:
+  {Fine}-{Grained} {Text} to {Image} {Generation} with {Attentional}
+  {Generative} {Adversarial} {Networks},'' {\em arXiv:1711.10485 [cs]}, Nov.
+  2017.
+\newblock arXiv: 1711.10485.
+
+\bibitem{kingma_glow:_2018}
+D.~P. Kingma and P.~Dhariwal, ``Glow: {Generative} {Flow} with {Invertible} 1x1
+  {Convolutions},'' {\em arXiv:1807.03039 [cs, stat]}, July 2018.
+\newblock arXiv: 1807.03039.
+
+\end{thebibliography}

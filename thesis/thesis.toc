@@ -1,0 +1,51 @@
+\contentsline {chapter}{Introduction}{2}% 
+\contentsline {section}{\numberline {0.1}Project Aims and Contributions}{2}% 
+\contentsline {section}{\numberline {0.2}The Problem At Hand}{2}% 
+\contentsline {subsection}{\numberline {0.2.1}Attributes of a Solution}{2}% 
+\contentsline {section}{\numberline {0.3}Thesis Outline}{3}% 
+\contentsline {chapter}{\numberline {1}Background}{4}% 
+\contentsline {section}{\numberline {1.1}Machine Learning}{4}% 
+\contentsline {section}{\numberline {1.2}Supervised Learning}{4}% 
+\contentsline {section}{\numberline {1.3}Unsupervised Learning}{4}% 
+\contentsline {section}{\numberline {1.4}Auto-Encoders}{4}% 
+\contentsline {section}{\numberline {1.5}Generative Modelling}{5}% 
+\contentsline {section}{\numberline {1.6}GANs}{5}% 
+\contentsline {subsection}{\numberline {1.6.1}Conditional GANs}{5}% 
+\contentsline {section}{\numberline {1.7}Transfer Learning}{5}% 
+\contentsline {chapter}{\numberline {2}Related Work}{6}% 
+\contentsline {section}{\numberline {2.1}Video Classification}{6}% 
+\contentsline {subsection}{\numberline {2.1.1}Inflated Convolutions}{6}% 
+\contentsline {subsubsection}{Two-Stream Network (I3D)}{6}% 
+\contentsline {subsection}{\numberline {2.1.2}Non-Local Blocks}{6}% 
+\contentsline {section}{\numberline {2.2}Generating Images}{7}% 
+\contentsline {subsection}{\numberline {2.2.1}StackGAN++}{7}% 
+\contentsline {subsection}{\numberline {2.2.2}BigGAN}{8}% 
+\contentsline {section}{\numberline {2.3}Generating Videos}{8}% 
+\contentsline {subsection}{\numberline {2.3.1}Video Generation From Text}{8}% 
+\contentsline {subsection}{\numberline {2.3.2}To Create What You Tell: Generating Videos from Captions}{8}% 
+\contentsline {subsection}{\numberline {2.3.3}TGAN and TGANv2}{9}% 
+\contentsline {section}{\numberline {2.4}Relativistic Discriminator}{9}% 
+\contentsline {chapter}{\numberline {3}Proposed Solution}{10}% 
+\contentsline {section}{\numberline {3.1}Why GANs?}{10}% 
+\contentsline {section}{\numberline {3.2}Baselines}{11}% 
+\contentsline {section}{\numberline {3.3}The Language Model}{11}% 
+\contentsline {section}{\numberline {3.4}Architecture}{11}% 
+\contentsline {subsection}{\numberline {3.4.1}Why take inspiration from TGANv2?}{11}% 
+\contentsline {subsection}{\numberline {3.4.2}Differences from TGANv2}{11}% 
+\contentsline {subsubsection}{Effectively Capturing Motion}{11}% 
+\contentsline {subsubsection}{Adding Conditional Information}{11}% 
+\contentsline {chapter}{\numberline {4}Experimentation}{12}% 
+\contentsline {section}{\numberline {4.1}Datasets}{12}% 
+\contentsline {section}{\numberline {4.2}Setup}{12}% 
+\contentsline {section}{\numberline {4.3}Evaluation}{13}% 
+\contentsline {section}{\numberline {4.4}Results, Findings and Analysis}{13}% 
+\contentsline {subsection}{\numberline {4.4.1}MNIST moving}{13}% 
+\contentsline {subsubsection}{TCWYT Baseline}{13}% 
+\contentsline {subsubsection}{My Method}{14}% 
+\contentsline {subsection}{\numberline {4.4.2}MRVDC}{15}% 
+\contentsline {subsubsection}{TCWYT Baseline}{15}% 
+\contentsline {subsubsection}{TGANv2 Baseline}{16}% 
+\contentsline {subsubsection}{My Method}{17}% 
+\contentsline {subsection}{\numberline {4.4.3}Observations During Training}{17}% 
+\contentsline {chapter}{\numberline {5}Conclusion}{18}% 
+\contentsline {section}{\numberline {5.1}Future Work}{18}% 

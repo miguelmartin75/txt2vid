@@ -44,7 +44,7 @@ Three datasets are used.
 
 MNIST with generated data from `txt2vid/data/synthetic/generate.py`
 
-TCWYT Baseline:
+### TCWYT Baseline:
 
 From top to bottom: 
 
@@ -64,11 +64,15 @@ From top to bottom:
 
 ### TCWYT (Conditional)
 
-`<start> a woman is saying about how to make vegetable tofu <unk> <end>'
-![tcwyt_1][./thesis/progress/imgs/mrvdc/test1.png]
+Bottom is ground truth for both of below
 
-`<start> the person is cooking <end>'
-![tcwyt_2][./thesis/progress/imgs/mrvdc/test2.png]
+`<start> a woman is saying about how to make vegetable tofu <unk> <end>'`
+
+![tcwyt_1](./thesis/progress/imgs/mrvdc/test1.png)
+
+`<start> the person is cooking <end>'`
+
+![tcwyt_2](./thesis/progress/imgs/mrvdc/test2.png)
 
 ### TGANv2 (Unconditional)
 
